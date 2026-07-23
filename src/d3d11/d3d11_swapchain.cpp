@@ -3,6 +3,7 @@
 #include "d3d11_swapchain.h"
 
 #include "../dxvk/dxvk_latency_builtin.h"
+#include "../dxvk/framepacer/dxvk_framepacer.h"
 
 #include "../util/util_win32_compat.h"
 
@@ -70,6 +71,8 @@ namespace dxvk {
     CreatePresenter();
     CreateBackBuffers();
     CreateBlitter();
+
+    m_framePacer = std::make_unique<FramePacer>(m_device->config(), m_frameId);
   }
 
 
@@ -410,6 +413,9 @@ namespace dxvk {
 
     m_frameId += 1;
 
+    if (m_framePacer)
+      m_framePacer->beginFrame();
+
     // Present from CS thread so that we don't
     // have to synchronize with it first.
     DxvkImageViewKey viewInfo = { };
@@ -429,6 +435,7 @@ namespace dxvk {
       cSwapImage      = GetBackBufferView(),
       cSync           = sync,
       cPresenter      = m_presenter,
+      cPacer          = m_framePacer.get(),
       cLatency        = m_latency,
       cColorSpace     = m_colorSpace,
       cFrameId        = m_frameId
@@ -451,6 +458,12 @@ namespace dxvk {
 
       // Submit current command list and present
       ctx->synchronizeWsi(cSync);
+
+      if (cPacer && cPacer->needsGpuSignal()) {
+        ctx->signal(cPacer->signal(), cFrameId);
+        cPacer->endFrame(cFrameId);
+      }
+
       ctx->flushCommandList(nullptr, nullptr);
 
       cDevice->presentImage(cPresenter, cLatency, cFrameId, nullptr);
@@ -664,6 +677,10 @@ namespace dxvk {
       maxFrameLatency = std::min(maxFrameLatency, m_frameLatencyCap);
 
     maxFrameLatency = std::min(maxFrameLatency, m_desc.BufferCount);
+
+    if (m_framePacer)
+      maxFrameLatency = m_framePacer->getEffectiveFrameLatency(maxFrameLatency);
+
     return maxFrameLatency;
   }
 

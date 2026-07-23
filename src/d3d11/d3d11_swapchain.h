@@ -13,6 +13,7 @@ namespace dxvk {
   
   class D3D11Device;
   class D3D11DXGIDevice;
+  class FramePacer;
 
   class D3D11SwapChain : public ComObject<IDXGIVkSwapChain2> {
     constexpr static uint32_t DefaultFrameLatency = 1;
@@ -117,6 +118,7 @@ namespace dxvk {
     uint32_t                  m_frameLatencyCap = 0;
     HANDLE                    m_frameLatencyEvent = nullptr;
     Rc<sync::CallbackFence>   m_frameLatencySignal;
+    std::unique_ptr<FramePacer> m_framePacer;
 
     VkColorSpaceKHR           m_colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 

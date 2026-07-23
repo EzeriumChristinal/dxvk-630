@@ -97,6 +97,12 @@ namespace dxvk {
 
     /// Number of async compiler threads (0 = auto)
     int32_t numDyasyncThreads = 0;
+
+    /// Frame pacing mode. Supported values: "", "low-latency", "min-latency".
+    std::string framePace;
+
+    /// Fine-tuning offset for low-latency frame pacing, in microseconds.
+    int32_t lowLatencyOffset = 0;
   };
 
 }

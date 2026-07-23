@@ -24,7 +24,7 @@ The Sarek fork contributed the dyasync infrastructure and Gen9 device detection.
 |---------------|-----------------|
 | Async pipeline compilation (dyasync) | Kept and wired into auto-detected Gen9 profile |
 | Gen9 low-power device profile | Kept and simplified — no multi-GPU branching |
-| Frame pacer (Phase 6) | Not yet ported — pending |
+| Frame pacer (Phase 6) | Ported — three modes: max-frame-latency (default), low-latency (predictive), min-latency (clamp only) |
 | Multi-vendor GPU profiles (NVIDIA/AMD) | Not ported — Intel UHD 630 only |
 
 ## Building
