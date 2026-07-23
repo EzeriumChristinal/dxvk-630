@@ -1126,7 +1126,7 @@ namespace dxvk {
     Tristate tearFree = m_device->config().tearFree;
 
     if (!syncInterval) {
-      if (tearFree != Tristate::True)
+      if (tearFree != Tristate::True || m_allowTearing)
         desired[numDesired++] = VK_PRESENT_MODE_IMMEDIATE_KHR;
       desired[numDesired++] = VK_PRESENT_MODE_MAILBOX_KHR;
     } else {
@@ -1162,6 +1162,11 @@ namespace dxvk {
 
   void Presenter::setBufferCount(uint32_t bufferCount) {
     m_preferredBufferCount = bufferCount;
+  }
+
+
+  void Presenter::setAllowTearing(bool allowTearing) {
+    m_allowTearing = allowTearing;
   }
 
 

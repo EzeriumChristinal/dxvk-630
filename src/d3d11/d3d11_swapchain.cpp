@@ -184,6 +184,9 @@ namespace dxvk {
     if (m_desc.BufferCount != pDesc->BufferCount)
       m_presenter->setBufferCount(pDesc->BufferCount);
 
+    if ((m_desc.Flags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) != (pDesc->Flags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING))
+      m_presenter->setAllowTearing((pDesc->Flags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) != 0);
+
     m_desc = *pDesc;
     CreateBackBuffers();
     return S_OK;
@@ -520,6 +523,7 @@ namespace dxvk {
 
     m_presenter->setSurfaceFormat(GetSurfaceFormat(m_desc.Format));
     m_presenter->setSurfaceExtent({ m_desc.Width, m_desc.Height });
+    m_presenter->setAllowTearing((m_desc.Flags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) != 0);
     m_presenter->setFrameRateLimit(m_targetFrameRate, GetActualFrameLatency());
 
     m_latency = m_device->createLatencyTracker(m_presenter);

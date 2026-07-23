@@ -190,6 +190,15 @@ namespace dxvk {
     void setBufferCount(uint32_t bufferCount);
 
     /**
+     * \brief Sets ALLOW_TEARING flag
+     *
+     * When set, IMMEDIATE present mode is preferred
+     * for zero-sync-interval presents.
+     * \param [in] allowTearing Whether tearing is allowed
+     */
+    void setAllowTearing(bool allowTearing);
+
+    /**
      * \brief Sets HDR metadata
      *
      * Updated HDR metadata will be applied on the next \c acquire.
@@ -298,6 +307,7 @@ namespace dxvk {
     bool                        m_dirtySwapchain = false;
     bool                        m_dirtySurface = false;
 
+    bool                        m_allowTearing = false;
     bool                        m_hasPresentId = false;
     bool                        m_hasPresentWait = false;
     bool                        m_hasSwapchainMaintenance1 = false;
