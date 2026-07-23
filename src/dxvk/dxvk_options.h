@@ -84,7 +84,7 @@ namespace dxvk {
     bool enableNvRawAccessChains = true;
 
     /// Enable descriptor update templates
-    bool enableDescriptorUpdateTemplates = env::is32BitHostPlatform();
+    bool enableDescriptorUpdateTemplates = true;
 
     /// Device name
     std::string deviceFilter;

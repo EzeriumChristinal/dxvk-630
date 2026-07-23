@@ -201,6 +201,9 @@ namespace dxvk {
     BOOL             m_monitorFallback;
 
     D3DDestructionNotifier m_destructionNotifier;
+
+    HWND   m_windowAssociation = nullptr;
+    UINT   m_windowAssociationFlags = 0;
       
 
     HRESULT STDMETHODCALLTYPE CreateSwapChainBase(

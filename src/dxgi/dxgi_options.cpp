@@ -166,8 +166,8 @@ namespace dxvk {
     this->customDeviceDesc = config.getOption<std::string>("dxgi.customDeviceDesc", "");
 
     // Interpret the memory limits as Megabytes
-    this->maxDeviceMemory = VkDeviceSize(config.getOption<int32_t>("dxgi.maxDeviceMemory", 0)) << 20;
-    this->maxSharedMemory = VkDeviceSize(config.getOption<int32_t>("dxgi.maxSharedMemory", 0)) << 20;
+    this->maxDeviceMemory = VkDeviceSize(config.getOption<int32_t>("dxgi.maxDeviceMemory", 0)) * VkDeviceSize(1 << 20);
+    this->maxSharedMemory = VkDeviceSize(config.getOption<int32_t>("dxgi.maxSharedMemory", 0)) * VkDeviceSize(1 << 20);
 
     this->maxFrameRate     = config.getOption<int32_t>("dxvk.maxFrameRate",
                              config.getOption<int32_t>("dxgi.maxFrameRate", 0));

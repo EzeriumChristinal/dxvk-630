@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mutex>
+#include <unordered_map>
 #include <vector>
 
 #include "../dxgi/dxgi_object.h"
@@ -518,6 +519,10 @@ namespace dxvk {
     D3D11DeviceFeatures             m_deviceFeatures;
 
     Com<D3D11ImmediateContext, false> m_context;
+
+    dxvk::mutex                                m_removedEventMutex;
+    std::unordered_map<DWORD, HANDLE>          m_removedEvents;
+    DWORD                                      m_removedEventCounter = 0;
 
     HRESULT CreateShaderModule(
             D3D11CommonShader*      pShaderModule,

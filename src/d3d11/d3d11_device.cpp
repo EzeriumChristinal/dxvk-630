@@ -1964,22 +1964,29 @@ namespace dxvk {
   HRESULT STDMETHODCALLTYPE D3D11Device::RegisterDeviceRemovedEvent(
           HANDLE                    hEvent,
           DWORD*                    pdwCookie) {
-    static bool s_errorShown = false;
+    if (!hEvent || !pdwCookie)
+      return E_INVALIDARG;
 
-    if (!std::exchange(s_errorShown, true))
-      Logger::warn("D3D11Device::RegisterDeviceRemovedEvent: Stub");
+    DWORD cookie;
+    {
+      std::lock_guard lock(m_removedEventMutex);
+      cookie = ++m_removedEventCounter;
+      m_removedEvents[cookie] = hEvent;
+    }
 
-    *pdwCookie = 0xdeadbeef;
+    *pdwCookie = cookie;
+
+    if (m_dxvkDevice->getDeviceStatus() != VK_SUCCESS)
+      SetEvent(hEvent);
+
     return S_OK;
   }
 
 
   void STDMETHODCALLTYPE D3D11Device::UnregisterDeviceRemoved(
           DWORD                     dwCookie) {
-    static bool s_errorShown = false;
-
-    if (!std::exchange(s_errorShown, true))
-      Logger::err("D3D11Device::UnregisterDeviceRemovedEvent: Not implemented");
+    std::lock_guard lock(m_removedEventMutex);
+    m_removedEvents.erase(dwCookie);
   }
 
 

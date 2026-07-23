@@ -463,9 +463,10 @@ namespace dxvk {
   void Presenter::setSyncInterval(uint32_t syncInterval) {
     std::lock_guard lock(m_surfaceMutex);
 
-    // Normalize sync interval for present modes. We currently
-    // cannot support anything other than 1 natively anyway.
-    syncInterval = std::min(syncInterval, 1u);
+    // Normalize sync interval. With present wait support we
+    // can handle intervals >1 natively via VK_KHR_present_wait.
+    if (!m_hasPresentWait)
+      syncInterval = std::min(syncInterval, 1u);
 
     if (m_preferredSyncInterval != syncInterval) {
       m_preferredSyncInterval = syncInterval;
@@ -1159,12 +1160,19 @@ namespace dxvk {
   }
 
 
+  void Presenter::setBufferCount(uint32_t bufferCount) {
+    m_preferredBufferCount = bufferCount;
+  }
+
+
   uint32_t Presenter::pickImageCount(
           uint32_t                  minImageCount,
           uint32_t                  maxImageCount) {
-    uint32_t count = minImageCount + 1;
+    uint32_t count = m_preferredBufferCount
+      ? std::max(minImageCount, m_preferredBufferCount)
+      : minImageCount + 1;
 
-    if (count > maxImageCount && maxImageCount != 0)
+    if (maxImageCount && count > maxImageCount)
       count = maxImageCount;
 
     return count;

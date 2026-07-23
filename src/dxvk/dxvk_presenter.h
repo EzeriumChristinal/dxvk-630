@@ -182,6 +182,14 @@ namespace dxvk {
     void setSurfaceExtent(VkExtent2D extent);
 
     /**
+     * \brief Sets preferred buffer count
+     *
+     * Overrides the default triple-buffering heuristic.
+     * \param [in] bufferCount Preferred image count (0 = auto)
+     */
+    void setBufferCount(uint32_t bufferCount);
+
+    /**
      * \brief Sets HDR metadata
      *
      * Updated HDR metadata will be applied on the next \c acquire.
@@ -285,6 +293,7 @@ namespace dxvk {
     VkExtent2D                  m_preferredExtent = { };
     VkSurfaceFormatKHR          m_preferredFormat = { };
     uint32_t                    m_preferredSyncInterval = 1u;
+    uint32_t                    m_preferredBufferCount = 0;
 
     bool                        m_dirtySwapchain = false;
     bool                        m_dirtySurface = false;

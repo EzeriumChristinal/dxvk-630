@@ -82,8 +82,9 @@ namespace dxvk {
       m_writeQueue.push(std::move(shader));
       m_writeCond.notify_one();
 
-      if (!m_writer.joinable())
+      std::call_once(m_writerOnce, [this] {
         m_writer = dxvk::thread([this] { runWriter(); });
+      });
     }
   }
 
@@ -683,12 +684,14 @@ namespace dxvk {
     // The ref count can only be incremented from 0 to 1 inside a locked
     // context, so this check is safe. Don't destroy the object if another
     // thread has essentially revived it.
-    if (m_useCount.load() || s_instance.instance != this) {
-      if (s_instance.instance == this)
-        s_instance.instance = nullptr;
+    if (m_useCount.load())
+      return;
 
-      delete this;
-    }
+    if (s_instance.instance != this)
+      return;
+
+    s_instance.instance = nullptr;
+    delete this;
   }
 
 

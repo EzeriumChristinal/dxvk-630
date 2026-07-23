@@ -132,6 +132,7 @@ namespace dxvk {
     std::queue<Rc<DxvkIrShader>>  m_writeQueue;
 
     dxvk::thread                  m_writer;
+    std::once_flag                m_writerOnce;
 
     DxvkShaderCache();
 
