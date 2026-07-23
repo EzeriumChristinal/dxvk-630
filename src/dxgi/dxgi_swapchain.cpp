@@ -478,13 +478,6 @@ namespace dxvk {
     newDisplayMode.ScanlineOrdering = pNewTargetParameters->ScanlineOrdering;
     newDisplayMode.Scaling = pNewTargetParameters->Scaling;
 
-    // Update the swap chain description
-    if (newDisplayMode.RefreshRate.Numerator != 0)
-      m_descFs.RefreshRate = newDisplayMode.RefreshRate;
-    
-    m_descFs.ScanlineOrdering = newDisplayMode.ScanlineOrdering;
-    m_descFs.Scaling          = newDisplayMode.Scaling;
-    
     if (m_descFs.Windowed) {
       wsi::resizeWindow(
         m_window, &m_windowState,
@@ -513,6 +506,13 @@ namespace dxvk {
       ChangeDisplayMode(output.ptr(), &newDisplayMode);
       wsi::updateFullscreenWindow(m_monitor, m_window, false);
     }
+
+    // Update the swap chain description after all operations succeed
+    if (newDisplayMode.RefreshRate.Numerator != 0)
+      m_descFs.RefreshRate = newDisplayMode.RefreshRate;
+    
+    m_descFs.ScanlineOrdering = newDisplayMode.ScanlineOrdering;
+    m_descFs.Scaling          = newDisplayMode.Scaling;
 
     return S_OK;
   }

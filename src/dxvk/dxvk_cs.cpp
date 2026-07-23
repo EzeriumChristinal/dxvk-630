@@ -167,11 +167,8 @@ namespace dxvk {
     // Avoid locking if we know the sync is a no-op, may
     // reduce overhead if this is being called frequently
     if (seq > m_seqOrdered.load()) {
-      // We don't need to lock the queue here, if synchronization
-      // happens while another thread is submitting then there is
-      // an inherent race anyway
       if (seq == SynchronizeAll)
-        seq = m_queueOrdered.seqDispatch;
+        seq = m_queueOrdered.seqDispatch.load(std::memory_order_relaxed);
 
       auto t0 = dxvk::high_resolution_clock::now();
 

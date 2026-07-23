@@ -383,7 +383,8 @@ namespace dxvk {
       auto sequenceNumber = pResource->GetSequenceNumber();
 
       if (MapType != D3D11_MAP_READ && !MapFlags && bufferSize <= D3D11Initializer::MaxMemoryPerSubmission) {
-        SynchronizeCsThread(sequenceNumber);
+        if (buffer->isInUse(DxvkAccess::Write) || buffer->isInUse(DxvkAccess::Read))
+          SynchronizeCsThread(sequenceNumber);
 
         bool hasWoAccess = buffer->isInUse(DxvkAccess::Write);
         bool hasRwAccess = buffer->isInUse(DxvkAccess::Read);
@@ -1019,14 +1020,7 @@ namespace dxvk {
         }
 
         // Unbind all dirty unordered access views
-        VkShaderStageFlags uavStages = 0u;
-
-        if (dxStage == D3D11ShaderType::eCompute)
-          uavStages = VK_SHADER_STAGE_COMPUTE_BIT;
-        else if (dxStage == D3D11ShaderType::ePixel)
-          uavStages = VK_SHADER_STAGE_ALL_GRAPHICS;
-
-        if (uavStages) {
+        if (cDirtyState[dxStage].uavMask) {
           auto uavSlot = D3D11ShaderResourceMapping::computeUavBinding(dxStage, 0);
           auto ctrSlot = D3D11ShaderResourceMapping::computeUavCounterBinding(dxStage, 0);
 

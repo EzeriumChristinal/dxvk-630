@@ -492,6 +492,7 @@ namespace dxvk {
     D3D11DXGIDevice*                m_container;
 
     D3D_FEATURE_LEVEL               m_featureLevel;
+    dxvk::mutex                     m_featureLevelLock;
     UINT                            m_featureFlags;
     
     const Rc<DxvkDevice>            m_dxvkDevice;

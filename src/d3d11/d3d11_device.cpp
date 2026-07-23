@@ -1345,8 +1345,11 @@ namespace dxvk {
       return E_INVALIDARG;
 
     if (m_featureLevel < featureLevel) {
-      m_featureLevel = featureLevel;
-      m_deviceFeatures = D3D11DeviceFeatures(*m_dxvkDevice, m_d3d11Options, m_featureLevel);
+      std::lock_guard<dxvk::mutex> lock{ m_featureLevelLock };
+      if (m_featureLevel < featureLevel) {
+        m_featureLevel = featureLevel;
+        m_deviceFeatures = D3D11DeviceFeatures(*m_dxvkDevice, m_d3d11Options, m_featureLevel);
+      }
     }
 
     if (pChosenFeatureLevel)
@@ -1431,7 +1434,7 @@ namespace dxvk {
       return;
 
     CopySubresourceData(
-      pSrcData, SrcRowPitch, SrcRowPitch,
+      pSrcData, SrcRowPitch, SrcDepthPitch,
       texture, DstSubresource, pDstBox);
   }
 
@@ -1823,8 +1826,9 @@ namespace dxvk {
     VkResult status = m_dxvkDevice->getDeviceStatus();
 
     switch (status) {
-      case VK_SUCCESS: return S_OK;
-      default:         return DXGI_ERROR_DEVICE_RESET;
+      case VK_SUCCESS:         return S_OK;
+      case VK_ERROR_DEVICE_LOST: return DXGI_ERROR_DEVICE_REMOVED;
+      default:                  return DXGI_ERROR_DEVICE_RESET;
     }
   }
   
@@ -2026,8 +2030,11 @@ namespace dxvk {
         return pair.first == maxLevel;
       });
 
-    if (entry != s_featureLevels.end())
-      return entry->second;
+    if (entry != s_featureLevels.end()) {
+      D3D_FEATURE_LEVEL configLevel = entry->second;
+      D3D_FEATURE_LEVEL deviceLevel = D3D11DeviceFeatures::GetMaxFeatureLevel(Device);
+      return std::min(configLevel, deviceLevel);
+    }
 
     // Otherwise, check the actually available device features
     return D3D11DeviceFeatures::GetMaxFeatureLevel(Device);

@@ -141,7 +141,7 @@ namespace dxvk {
     std::mutex                        m_pipelineMutex;
     std::array<PipelineBucket, 3>     m_buckets;
 
-    bool                              m_workersRunning = false;
+    std::atomic<bool>                 m_workersRunning = { false };
     std::vector<dxvk::thread>         m_workers;
 
     void notifyWorkers(DxvkPipelinePriority priority);

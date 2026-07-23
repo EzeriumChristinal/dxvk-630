@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <optional>
 #include <vector>
 
@@ -259,9 +260,9 @@ namespace dxvk {
      * \returns Shader metadata
      */
     const DxvkShaderMetadata& metadata() {
-      if (unlikely(!m_metadata))
+      std::call_once(m_metadataOnce, [this] {
         m_metadata = getShaderMetadata();
-
+      });
       return *m_metadata;
     }
 
@@ -364,6 +365,7 @@ namespace dxvk {
     std::atomic<bool>             m_needsCompile = { true };
 
     std::optional<DxvkShaderMetadata> m_metadata;
+    std::once_flag                     m_metadataOnce;
 
   };
   

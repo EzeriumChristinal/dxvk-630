@@ -18,7 +18,7 @@ namespace dxvk {
      * \returns New reference count
      */
     force_inline uint32_t incRef() {
-      return ++m_refCount;
+      return m_refCount.fetch_add(1u, std::memory_order_relaxed) + 1u;
     }
     
     /**
@@ -26,7 +26,7 @@ namespace dxvk {
      * \returns New reference count
      */
     force_inline uint32_t decRef() {
-      return --m_refCount;
+      return m_refCount.fetch_sub(1u, std::memory_order_acq_rel) - 1u;
     }
     
   private:

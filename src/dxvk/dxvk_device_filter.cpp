@@ -57,7 +57,8 @@ namespace dxvk {
     }
 
     if (m_flags.test(DxvkDeviceFilterFlag::MatchDeviceName)) {
-      if (std::string(adapterInfo.deviceName).find(m_matchDeviceName) == std::string::npos) {
+      std::string name = Config::toLower(adapterInfo.deviceName);
+      if (name.find(Config::toLower(m_matchDeviceName)) == std::string::npos) {
         Logger::info("  Skipping: Device filter");
         return false;
       }

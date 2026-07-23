@@ -176,9 +176,6 @@ namespace dxvk {
     small_vector<LUID, 2> adapterLUIDs = { };
     small_vector<const LUID*, 2> luidPointers;
 
-    if (m_adapter->isLinkedToDGPU())
-      return DXGI_ERROR_NOT_FOUND;
-
     if (adapterInfo.luidIsValid) {
       auto& luid = adapterLUIDs.emplace_back();
       std::memcpy(&luid, adapterInfo.deviceLuid, sizeof(luid));

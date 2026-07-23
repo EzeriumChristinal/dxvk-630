@@ -15,9 +15,8 @@ namespace dxvk {
           D3D_FEATURE_LEVEL     FeatureLevel) {
     const auto& features = Device.features();
 
-    // Assume no TBDR. DXVK does not optimize for TBDR architectures
-    // anyway, and D3D11 does not really provide meaningful support.
-    m_architectureInfo.TileBasedDeferredRenderer          = FALSE;
+    m_architectureInfo.TileBasedDeferredRenderer = Device.properties().core.properties.vendorID == 0x1010
+      ? TRUE : FALSE;
 
     // D3D9 options. We unconditionally support all of these.
     m_d3d9Options.FullNonPow2TextureSupport               = TRUE;

@@ -50,7 +50,7 @@ namespace dxvk {
     Tristate latencySleep = Tristate::Auto;
 
     /// Latency tolerance, in microseconds
-    int32_t latencyTolerance = 0u;
+    int32_t latencyTolerance = 1000;
 
     /// Disable VK_NV_low_latency2. This extension
     /// appears to be all sorts of broken on 32-bit.

@@ -1434,8 +1434,8 @@ namespace dxvk {
         try {
           std::regex expr(pair.first, std::regex::extended | std::regex::icase);
           return std::regex_search(appName, expr);
-        } catch (const std::bad_alloc& e) {
-          Logger::err(str::format("Failed to parse regular expression: ", pair.first));
+        } catch (const std::exception& e) {
+          Logger::err(str::format("Failed to parse regular expression '", pair.first, "': ", e.what()));
           return false;
         }
       });
@@ -1505,6 +1505,9 @@ namespace dxvk {
     if (n < line.size() && line[n] == '[') {
       n += 1;
 
+      if (line.empty())
+        return;
+
       size_t e = line.size() - 1;
       while (e > n && line[e] != ']')
         e -= 1;
@@ -1527,7 +1530,7 @@ namespace dxvk {
       n = skipWhitespace(line, n + 1);
 
       while (n < line.size()) {
-        if (!insideString && isWhitespace(line[n]))
+        if (!insideString && (isWhitespace(line[n]) || line[n] == '#' || line[n] == ';'))
           break;
 
         if (line[n] == '"') {
@@ -1606,19 +1609,23 @@ namespace dxvk {
       start = 1;
     }
 
-    // Parse absolute number
-    int32_t intval = 0;
+    // Parse absolute number with overflow check
+    int64_t intval = 0;
 
     for (size_t i = start; i < value.size(); i++) {
       if (value[i] < '0' || value[i] > '9')
         return false;
 
-      intval *= 10;
-      intval += value[i] - '0';
+      int64_t next = intval * 10 + int64_t(value[i] - '0');
+
+      if (next > 2147483648u)
+        return false;
+
+      intval = next;
     }
 
     // Apply sign and return
-    result = sign * intval;
+    result = int32_t(sign * intval);
     return true;
   }
 

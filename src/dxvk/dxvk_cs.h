@@ -500,7 +500,7 @@ namespace dxvk {
    */
   struct DxvkCsChunkQueue {
     std::vector<DxvkCsQueuedChunk> queue;
-    uint64_t                       seqDispatch = 0u;
+    std::atomic<uint64_t>          seqDispatch = { 0u };
   };
 
 

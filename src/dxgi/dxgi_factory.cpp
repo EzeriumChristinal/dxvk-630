@@ -369,14 +369,19 @@ namespace dxvk {
     if (Adapter >= adapterCount)
       return DXGI_ERROR_NOT_FOUND;
 
-    // We know that the backend lists dedicated GPUs before
-    // any integrated ones, so just list adapters in reverse
-    // order. We have no other way to estimate performance.
-    if (GpuPreference == DXGI_GPU_PREFERENCE_MINIMUM_POWER)
-      Adapter = adapterCount - Adapter - 1;
-
     Com<IDXGIAdapter> adapter;
-    HRESULT hr = this->EnumAdapters(Adapter, &adapter);
+    HRESULT hr;
+
+    if (GpuPreference == DXGI_GPU_PREFERENCE_MINIMUM_POWER) {
+      // Enumerate from the end to prefer integrated GPUs
+      hr = this->EnumAdapters(adapterCount - Adapter - 1, &adapter);
+    } else if (GpuPreference == DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE) {
+      // Enumerate from the start to prefer discrete GPUs
+      hr = this->EnumAdapters(Adapter, &adapter);
+    } else {
+      // Unspecified — default enumeration order
+      hr = this->EnumAdapters(Adapter, &adapter);
+    }
 
     if (FAILED(hr))
       return hr;

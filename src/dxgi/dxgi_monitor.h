@@ -75,7 +75,9 @@ namespace dxvk {
     dxgiMode.Width            = WsiMode.width;
     dxgiMode.Height           = WsiMode.height;
     dxgiMode.RefreshRate      = DXGI_RATIONAL{ WsiMode.refreshRate.numerator, WsiMode.refreshRate.denominator };
-    dxgiMode.Format           = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // FIXME
+    dxgiMode.Format           = WsiMode.bitsPerPixel == 32
+      ? DXGI_FORMAT_R8G8B8A8_UNORM
+      : DXGI_FORMAT_B8G8R8A8_UNORM;
     dxgiMode.ScanlineOrdering = WsiMode.interlaced ? DXGI_MODE_SCANLINE_ORDER_UPPER_FIELD_FIRST : DXGI_MODE_SCANLINE_ORDER_PROGRESSIVE;
     dxgiMode.Scaling          = DXGI_MODE_SCALING_UNSPECIFIED;
     dxgiMode.Stereo           = FALSE;

@@ -80,7 +80,7 @@ namespace dxvk {
 
 
   void DxvkPipelineWorkers::startWorkers() {
-    if (!std::exchange(m_workersRunning, true)) {
+    if (!m_workersRunning.exchange(true)) {
       // Determine number of available CPU cores, and clamp to a useful
       // range. DXVK is not tested on extremely high core counts, and
       // parallelism may be limited past a certain point.

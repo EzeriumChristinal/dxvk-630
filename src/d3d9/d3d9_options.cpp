@@ -70,7 +70,7 @@ namespace dxvk {
     this->forceDrawTimeBufferUpload     = config.getOption<bool>        ("d3d9.forceDrawTimeBufferUpload",     false);
     this->ignoreDefaultBufferLockRange  = config.getOption<bool>        ("d3d9.ignoreDefaultBufferLockRange",  false);
     this->seamlessCubes                 = config.getOption<bool>        ("d3d9.seamlessCubes",                 false);
-    this->textureMemory                 = config.getOption<int32_t>     ("d3d9.textureMemory",                 100) << 20;
+    this->textureMemory                 = int32_t(std::min<int64_t>(int64_t(config.getOption<int32_t>("d3d9.textureMemory", 100)) << 20, INT32_MAX));
     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
