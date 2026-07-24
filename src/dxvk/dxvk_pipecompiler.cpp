@@ -167,8 +167,10 @@ namespace dxvk {
 
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    if (queue.size() >= DYASYNC_QUEUE_CAPACITY)
+    if (queue.size() >= DYASYNC_QUEUE_CAPACITY) {
+      Logger::warn("DXVK: Dyasync queue full, pipeline compile dropped");
       return false;
+    }
 
     if (entry.pipeline) {
       if (!m_queuedGraphicsPipelines.insert(entry.pipeline).second)

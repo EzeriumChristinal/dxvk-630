@@ -274,7 +274,7 @@ namespace dxvk {
      * \returns \c true if compilation is still needed
      */
     bool needsCompile() const {
-      return m_needsCompile.load();
+      return m_needsCompile.load(std::memory_order_acquire);
     }
 
     /**
@@ -285,7 +285,7 @@ namespace dxvk {
      * if compilation is still required, and \c false otherwise.
      */
     bool notifyCompile() {
-      return m_needsCompile.exchange(false);
+      return m_needsCompile.exchange(false, std::memory_order_acq_rel);
     }
 
     /**

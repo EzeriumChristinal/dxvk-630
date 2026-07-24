@@ -1086,46 +1086,6 @@ namespace dxvk {
   }
 
 
-  uintptr_t DxvkGraphicsPipeline::computeFallbackKey() {
-    return reinterpret_cast<uintptr_t>(this);
-  }
-
-
-  VkPipeline DxvkGraphicsPipeline::findFallback() {
-    uintptr_t key = computeFallbackKey();
-
-    for (uint32_t i = 0; i < FallbackProbeMax; i++) {
-      uint32_t idx = (uint32_t(key >> 8) + i) & FallbackMapMask;
-      auto& entry = m_fallbackMap[idx];
-
-      if (entry.key.load(std::memory_order_acquire) == key)
-        return entry.pipeline.load(std::memory_order_relaxed);
-    }
-
-    return VK_NULL_HANDLE;
-  }
-
-
-  void DxvkGraphicsPipeline::storeFallback(
-    const DxvkGraphicsPipelineStateInfo& state,
-          VkPipeline                     pipeline) {
-    uintptr_t key = computeFallbackKey();
-
-    for (uint32_t i = 0; i < FallbackProbeMax; i++) {
-      uint32_t idx = (uint32_t(key >> 8) + i) & FallbackMapMask;
-      auto& entry = m_fallbackMap[idx];
-
-      uintptr_t expected = 0;
-      if (entry.key.compare_exchange_strong(expected, key,
-              std::memory_order_release, std::memory_order_relaxed)) {
-        entry.pipeline.store(pipeline, std::memory_order_relaxed);
-        entry.used.store(1, std::memory_order_relaxed);
-        return;
-      }
-    }
-  }
-
-
   DxvkGraphicsPipelineHandle DxvkGraphicsPipeline::getPipelineHandle(
     const DxvkGraphicsPipelineStateInfo& state) {
     DxvkGraphicsPipelineInstance* instance = this->findInstance(state);

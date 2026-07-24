@@ -274,17 +274,6 @@ namespace dxvk {
   DxvkShaderPipelineLibraryHandle DxvkShaderPipelineLibrary::compileShaderPipelineLocked() {
     compileShaders();
 
-    // Increment stat counter the first time this
-    // shader pipeline gets compiled successfully
-    bool compiledBefore = std::exchange(m_compiledOnce, true);
-
-    if (!compiledBefore) {
-      if (m_shaders.findShader(VK_SHADER_STAGE_COMPUTE_BIT))
-        m_manager->m_stats.numComputePipelines += 1;
-      else
-        m_manager->m_stats.numGraphicsLibraries += 1;
-    }
-
     if (!canCreatePipelineLibrary())
       return { VK_NULL_HANDLE, 0 };
 
@@ -293,6 +282,7 @@ namespace dxvk {
     // If this is not the first time we're compiling the pipeline,
     // try to get a cache hit using the shader module identifier
     // so that we don't have to decompress our SPIR-V shader again.
+    bool compiledBefore = m_compiledOnce;
     DxvkShaderPipelineLibraryHandle pipeline = { VK_NULL_HANDLE, 0 };
 
     if (compiledBefore && canUsePipelineCacheControl())
@@ -301,9 +291,17 @@ namespace dxvk {
     if (!pipeline.handle)
       pipeline = this->compileShaderPipeline(0);
 
-    // Well that didn't work
     if (!pipeline.handle)
       return { VK_NULL_HANDLE, 0 };
+
+    // Increment stat counter the first time this
+    // shader pipeline gets compiled successfully
+    if (!std::exchange(m_compiledOnce, true)) {
+      if (m_shaders.findShader(VK_SHADER_STAGE_COMPUTE_BIT))
+        m_manager->m_stats.numComputePipelines += 1;
+      else
+        m_manager->m_stats.numGraphicsLibraries += 1;
+    }
 
     return pipeline;
   }

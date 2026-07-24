@@ -610,16 +610,6 @@ namespace dxvk {
 
   private:
 
-    struct FallbackMapEntry {
-      std::atomic<uintptr_t> key    = { 0 };
-      std::atomic<VkPipeline> pipeline = { VK_NULL_HANDLE };
-      std::atomic<uint8_t>    used  = { 0 };
-    };
-
-    static constexpr uint32_t FallbackMapSize    = 2048;
-    static constexpr uint32_t FallbackMapMask    = FallbackMapSize - 1;
-    static constexpr uint32_t FallbackProbeMax   = 16;
-
     DxvkDevice*                 m_device;    
     DxvkPipelineManager*        m_manager;
     DxvkPipelineWorkers*        m_workers;
@@ -660,8 +650,6 @@ namespace dxvk {
 
     DxvkPipelineCompiler*                         m_compiler = nullptr;
 
-    std::array<FallbackMapEntry, FallbackMapSize> m_fallbackMap;
-
     DxvkGraphicsPipelineInstance* createInstance(
       const DxvkGraphicsPipelineStateInfo& state,
             bool                           doCreateBasePipeline);
@@ -693,14 +681,6 @@ namespace dxvk {
 
     void destroyVulkanPipeline(
             VkPipeline                    pipeline) const;
-
-    void storeFallback(
-      const DxvkGraphicsPipelineStateInfo& state,
-            VkPipeline                     pipeline);
-
-    VkPipeline findFallback();
-
-    uintptr_t computeFallbackKey();
 
     SpirvCodeBuffer getShaderCode(
             DxvkShader&                   shader,
