@@ -162,13 +162,9 @@ namespace dxvk {
       }
 
       if (entry.pipelineLibrary) {
-        { std::lock_guard lock(m_pipelineMutex);
-          entry.pipelineLibrary->compilePipeline();
-        }
+        entry.pipelineLibrary->compilePipeline();
       } else if (entry.graphicsPipeline) {
-        { std::lock_guard lock(m_pipelineMutex);
-          entry.graphicsPipeline->compilePipeline(entry.graphicsState);
-        }
+        entry.graphicsPipeline->compilePipeline(entry.graphicsState);
         entry.graphicsPipeline->releasePipeline();
       }
 

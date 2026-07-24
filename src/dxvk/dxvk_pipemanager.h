@@ -138,7 +138,6 @@ namespace dxvk {
     std::atomic<uint64_t>             m_tasksCompleted = { 0ull };
 
     dxvk::mutex                       m_lock;
-    std::mutex                        m_pipelineMutex;
     std::array<PipelineBucket, 3>     m_buckets;
 
     std::atomic<bool>                 m_workersRunning = { false };

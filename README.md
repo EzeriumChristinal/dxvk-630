@@ -1,6 +1,6 @@
 # dxvk-630
 
-A DXVK fork tuned to squeeze maximum performance from **Intel UHD 630 (Gen9.5)** integrated GPUs. Targets low-power UMA systems where every cycle and byte of memory bandwidth counts.
+DXVK fork tuned for **Intel UHD 630 (Gen9.5)** iGPUs on low-power UMA systems with constrained memory bandwidth.
 
 Built on DXVK v3.0.2 with cherry-picks from the [Sarek](https://github.com/HansKristian-Work/dxvk) dyasync branch for async pipeline compilation and Gen9 low-power profile support.
 

@@ -368,7 +368,7 @@ namespace dxvk {
 
     if (wsi::isWindow(m_window) || !m_window) {
       std::lock_guard<dxvk::mutex> lockBuf(m_lockBuffer);
-      hr = m_presenter->Present(SyncInterval, PresentFlags, nullptr);
+      hr = m_presenter->Present(SyncInterval, PresentFlags, pPresentParameters);
     }
 
     if (PresentFlags & DXGI_PRESENT_TEST)

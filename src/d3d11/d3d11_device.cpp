@@ -1584,7 +1584,15 @@ namespace dxvk {
             Logger::warn(str::format("D3D11Device::OpenSharedResource1: Failed to open sync object"));
           else {
             fenceInfo.sharedType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-            fence = m_dxvkDevice->createFence(fenceInfo);
+            try {
+              fence = m_dxvkDevice->createFence(fenceInfo);
+            } catch (...) {
+              CloseHandle(fenceInfo.sharedHandle);
+              D3DKMT_DESTROYSYNCHRONIZATIONOBJECT destroySync = { };
+              destroySync.hSyncObject = open.hSyncObject;
+              D3DKMTDestroySynchronizationObject(&destroySync);
+              throw;
+            }
             CloseHandle(fenceInfo.sharedHandle);
           }
 #else
