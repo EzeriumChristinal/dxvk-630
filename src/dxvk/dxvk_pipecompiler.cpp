@@ -193,6 +193,18 @@ namespace dxvk {
   }
 
 
+  void DxvkPipelineCompiler::removePipeline(DxvkGraphicsPipeline* pipeline) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_queuedGraphicsPipelines.erase(pipeline);
+  }
+
+
+  void DxvkPipelineCompiler::removePipeline(DxvkComputePipeline* pipeline) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_queuedComputePipelines.erase(pipeline);
+  }
+
+
   bool DxvkPipelineCompiler::takeEntry(DxvkPipelineEntry& entry, bool preferBackground) {
     switch (select_lane(m_liveQueue.empty(), m_backgroundQueue.empty(), preferBackground)) {
       case TakeLane::Live:       entry = pop_front(m_liveQueue);       return true;
@@ -205,7 +217,8 @@ namespace dxvk {
 
 
   bool DxvkPipelineCompiler::waitForWork(DxvkPipelineEntry& entry) {
-    uint32_t pick = m_pickCounter.fetch_add(1, std::memory_order_relaxed);
+    thread_local uint32_t s_pick = 0;
+    uint32_t pick = s_pick++;
 
     std::unique_lock<std::mutex> lock(m_mutex);
 

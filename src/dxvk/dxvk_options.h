@@ -93,7 +93,7 @@ namespace dxvk {
     bool enableGen9Profile = false;
 
     /// Enable async pipeline compilation (dyasync)
-    bool enableDyasync = false;
+    Tristate enableDyasync = Tristate::Auto;
 
     /// Number of async compiler threads (0 = auto)
     int32_t numDyasyncThreads = 0;

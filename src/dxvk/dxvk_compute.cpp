@@ -28,6 +28,8 @@ namespace dxvk {
   
   
   DxvkComputePipeline::~DxvkComputePipeline() {
+    if (m_compiler)
+      m_compiler->removePipeline(this);
     m_library->releasePipelineHandle();
 
     m_pipelines.forEach([this] (const DxvkComputePipelineInstance& instance) {

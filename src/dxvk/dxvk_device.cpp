@@ -40,8 +40,10 @@ namespace dxvk {
 
     if (m_adapter->isGen9LowPower()) {
       m_options.enableGen9Profile = true;
-      m_options.enableDyasync = true;
-      m_options.useRawSsbo = Tristate::False;
+      if (m_options.enableDyasync == Tristate::Auto)
+        m_options.enableDyasync = Tristate::True;
+      if (m_options.useRawSsbo == Tristate::Auto)
+        m_options.useRawSsbo = Tristate::False;
       if (m_options.numDyasyncThreads == 0)
         m_options.numDyasyncThreads = std::min<int32_t>(4u,
           std::thread::hardware_concurrency());

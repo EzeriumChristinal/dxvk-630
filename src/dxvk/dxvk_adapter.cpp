@@ -393,12 +393,15 @@ namespace dxvk {
       return false;
 
     // Gen9 range: SKL (0x1900-0x193D)
-    // Gen9.5 range: KBL/CFL/WHL/AML/CML (0x3E80-0x3EFF, 0x5900-0x593F, 0x9B00-0x9BFF)
+    // Gen9.5 range: KBL/CFL/WHL/AML/CML (0x3E80-0x3EFF, 0x5900-0x593F, 0x87C0-0x87CF, 0x9B00-0x9BFF)
+    // Gemini Lake (0x3184-0x3185)
     uint32_t id = props.deviceID;
     return (id >= 0x1900 && id <= 0x193D)
         || (id >= 0x3E80 && id <= 0x3EFF)
         || (id >= 0x5900 && id <= 0x593F)
-        || (id >= 0x9B00 && id <= 0x9BFF);
+        || (id >= 0x87C0 && id <= 0x87CF)
+        || (id >= 0x9B00 && id <= 0x9BFF)
+        || (id >= 0x3184 && id <= 0x3185);
   }
 
 }

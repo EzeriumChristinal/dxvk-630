@@ -181,7 +181,7 @@ namespace dxvk {
           DxvkDevice*         device)
   : m_device    (device),
     m_workers   (device),
-    m_compiler  (device->config().enableDyasync
+    m_compiler  (device->config().enableDyasync == Tristate::True
       ? new DxvkPipelineCompiler(device) : nullptr) {
     Logger::info(str::format("Graphics pipeline libraries ",
       (m_device->canUseGraphicsPipelineLibrary() ? "supported" : "not supported")));

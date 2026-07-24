@@ -1068,6 +1068,8 @@ namespace dxvk {
   
   
   DxvkGraphicsPipeline::~DxvkGraphicsPipeline() {
+    if (m_compiler)
+      m_compiler->removePipeline(this);
     this->destroyBasePipelines();
     this->destroyOptimizedPipelines();
   }

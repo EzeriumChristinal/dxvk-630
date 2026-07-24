@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
@@ -47,6 +46,10 @@ namespace dxvk {
     const DxvkComputePipelineStateInfo&  state,
           DxvkPipelinePriority           priority);
 
+  void removePipeline(DxvkGraphicsPipeline* pipeline);
+
+  void removePipeline(DxvkComputePipeline* pipeline);
+
   private:
 
     std::mutex                    m_mutex;
@@ -58,8 +61,6 @@ namespace dxvk {
 
     std::unordered_set<DxvkGraphicsPipeline*> m_queuedGraphicsPipelines;
     std::unordered_set<DxvkComputePipeline*>  m_queuedComputePipelines;
-
-    std::atomic<uint32_t>         m_pickCounter = { 0 };
 
     std::vector<dxvk::thread>     m_workers;
 

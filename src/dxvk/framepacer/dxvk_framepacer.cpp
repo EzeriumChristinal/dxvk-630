@@ -41,7 +41,7 @@ namespace dxvk {
     DxvkFramePace parse_frame_pace(std::string_view configured) {
       auto entry = std::find_if(FRAME_PACE_NAMES.begin(), FRAME_PACE_NAMES.end(),
         [configured] (FramePaceName candidate) {
-          return configured.find(candidate.name) != std::string_view::npos;
+          return configured == candidate.name;
         });
 
       return entry != FRAME_PACE_NAMES.end() ? entry->mode : DxvkFramePace::MaxFrameLatency;

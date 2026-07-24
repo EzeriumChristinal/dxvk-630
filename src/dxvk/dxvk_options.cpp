@@ -27,7 +27,7 @@ namespace dxvk {
     lowerSinCos           = config.getOption<Tristate>("dxvk.lowerSinCos",            Tristate::Auto);
     tilerMode             = config.getOption<Tristate>("dxvk.tilerMode",              Tristate::Auto);
 
-    enableDyasync        = config.getOption<bool>    ("dxvk.enableDyasync",        false);
+    enableDyasync        = config.getOption<Tristate>("dxvk.enableDyasync",        Tristate::Auto);
     numDyasyncThreads    = config.getOption<int32_t> ("dxvk.numDyasyncThreads",    0);
 
     framePace          = config.getOption<std::string>("dxvk.framePace",         "");
