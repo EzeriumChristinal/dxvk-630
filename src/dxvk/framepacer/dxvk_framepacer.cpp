@@ -56,9 +56,9 @@ namespace dxvk {
     int32_t blend_frame_duration(int32_t previousAvgUs, int32_t latestDurationUs) {
       return previousAvgUs == 0
         ? latestDurationUs
-        : (previousAvgUs * FRAME_DURATION_SMOOTHING_OLD_WEIGHT
-             + latestDurationUs * FRAME_DURATION_SMOOTHING_NEW_WEIGHT)
-          / FRAME_DURATION_SMOOTHING_TOTAL_WEIGHT;
+        : int32_t((int64_t(previousAvgUs) * FRAME_DURATION_SMOOTHING_OLD_WEIGHT
+                 + int64_t(latestDurationUs) * FRAME_DURATION_SMOOTHING_NEW_WEIGHT)
+                 / FRAME_DURATION_SMOOTHING_TOTAL_WEIGHT);
     }
 
 
@@ -104,6 +104,12 @@ namespace dxvk {
   }
 
 
+  FramePacer::~FramePacer() {
+    if (m_signal)
+      m_signal->clearCallbacks();
+  }
+
+
   uint32_t FramePacer::getEffectiveFrameLatency(uint32_t configuredLatency) const {
     switch (m_mode) {
       case DxvkFramePace::MaxFrameLatency: return configuredLatency;
@@ -116,13 +122,23 @@ namespace dxvk {
 
 
   void FramePacer::beginFrame() {
-    auto wakeTime = predict_wake_time(m_mode, m_lastFrameStart,
-      m_avgFrameDurationUs.load(), m_lowLatencyOffsetUs);
+    std::optional<std::chrono::high_resolution_clock::time_point> wakeTime;
+    {
+      std::lock_guard<std::mutex> lock(m_frameStartMutex);
+      wakeTime = predict_wake_time(m_mode, m_lastFrameStart,
+        m_avgFrameDurationUs.load(), m_lowLatencyOffsetUs);
+    }
 
-    if (wakeTime.has_value())
-      std::this_thread::sleep_until(*wakeTime);
+    if (wakeTime.has_value()) {
+      auto target = *wakeTime;
+      while (std::chrono::high_resolution_clock::now() < target)
+        std::this_thread::sleep_until(target);
+    }
 
-    m_lastFrameStart = std::chrono::high_resolution_clock::now();
+    {
+      std::lock_guard<std::mutex> lock(m_frameStartMutex);
+      m_lastFrameStart = std::chrono::high_resolution_clock::now();
+    }
   }
 
 
@@ -130,9 +146,16 @@ namespace dxvk {
     if (m_mode != DxvkFramePace::LowLatency)
       return;
 
-    auto frameStart = *m_lastFrameStart;
+    std::optional<std::chrono::high_resolution_clock::time_point> frameStart;
+    {
+      std::lock_guard<std::mutex> lock(m_frameStartMutex);
+      frameStart = m_lastFrameStart;
+    }
 
-    m_signal->setCallback(frameId, [this, frameStart] () { recordFrameDuration(frameStart); });
+    if (!frameStart.has_value())
+      return;
+
+    m_signal->setCallback(frameId, [this, fs = *frameStart] () { recordFrameDuration(fs); });
   }
 
 

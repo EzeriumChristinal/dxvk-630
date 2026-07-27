@@ -27,6 +27,8 @@ namespace dxvk {
     m_presentParams = *pPresentParams;
     m_window = m_presentParams.hDeviceWindow;
 
+    m_framePacer = std::make_unique<FramePacer>(m_device->config(), D3D9DeviceEx::MaxFrameLatency);
+
     UpdateWindowCtx();
 
     UpdatePresentRegion(nullptr, nullptr);
@@ -184,6 +186,9 @@ namespace dxvk {
     if (useGDIFallback)
       return PresentImageGDI(m_window);
 #endif
+
+    if (m_framePacer)
+      m_framePacer->beginFrame();
 
     try {
       UpdateWindowedRefreshRate();
@@ -888,7 +893,8 @@ namespace dxvk {
         cDstRect        = dstRect,
         cSync           = sync,
         cFrameId        = m_wctx->frameId,
-        cLatency        = m_latencyTracker
+        cLatency        = m_latencyTracker,
+        cPacer          = m_framePacer.get()
       ] (DxvkContext* ctx) {
         // Update back buffer color space as necessary
         if (cSrcView->image()->info().colorSpace != cColorSpace) {
@@ -909,6 +915,9 @@ namespace dxvk {
         ctx->flushCommandList(nullptr, nullptr);
 
         cDevice->presentImage(cPresenter, cLatency, cFrameId, nullptr);
+
+        if (cPacer)
+          cPacer->endFrame(cFrameId);
       });
 
       m_parent->FlushCsChunk();
@@ -1148,6 +1157,10 @@ namespace dxvk {
       maxFrameLatency = std::min(maxFrameLatency, m_frameLatencyCap);
 
     maxFrameLatency = std::min(maxFrameLatency, m_presentParams.BackBufferCount + 1);
+
+    if (m_framePacer)
+      maxFrameLatency = m_framePacer->getEffectiveFrameLatency(maxFrameLatency);
+
     return maxFrameLatency;
   }
 

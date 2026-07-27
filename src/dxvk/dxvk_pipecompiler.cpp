@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <atomic>
 #include <utility>
 
 #include "dxvk_compute.h"
@@ -103,16 +104,13 @@ namespace dxvk {
           DxvkGraphicsPipeline*          pipeline,
     const DxvkGraphicsPipelineStateInfo& state,
           DxvkPipelinePriority           priority) {
-    bool pushed = this->pushEntry(DxvkPipelineEntry {
+    return this->pushEntry(DxvkPipelineEntry {
       pipeline,
       state,
       nullptr,
       DxvkComputePipelineStateInfo(),
       priority,
     });
-
-    this->notifyIfPushed(pushed);
-    return pushed;
   }
 
 
@@ -120,16 +118,13 @@ namespace dxvk {
           DxvkComputePipeline*           pipeline,
     const DxvkComputePipelineStateInfo&  state,
           DxvkPipelinePriority           priority) {
-    bool pushed = this->pushEntry(DxvkPipelineEntry {
+    return this->pushEntry(DxvkPipelineEntry {
       nullptr,
       DxvkGraphicsPipelineStateInfo(),
       pipeline,
       state,
       priority,
     });
-
-    this->notifyIfPushed(pushed);
-    return pushed;
   }
 
 
@@ -167,11 +162,6 @@ namespace dxvk {
 
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    if (queue.size() >= DYASYNC_QUEUE_CAPACITY) {
-      Logger::warn("DXVK: Dyasync queue full, pipeline compile dropped");
-      return false;
-    }
-
     if (entry.pipeline) {
       if (!m_queuedGraphicsPipelines.insert(entry.pipeline).second)
         return false;
@@ -181,27 +171,32 @@ namespace dxvk {
     }
 
     queue.push_back(std::move(entry));
+    m_cond.notify_one();
     return true;
-  }
-
-
-  void DxvkPipelineCompiler::notifyIfPushed(bool pushed) {
-    switch (pushed) {
-      case true:  m_cond.notify_one(); break;
-      case false: break;
-    }
   }
 
 
   void DxvkPipelineCompiler::removePipeline(DxvkGraphicsPipeline* pipeline) {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_queuedGraphicsPipelines.erase(pipeline);
+
+    auto pred = [pipeline](const DxvkPipelineEntry& e) { return e.pipeline == pipeline; };
+    m_liveQueue.erase(std::remove_if(m_liveQueue.begin(), m_liveQueue.end(), pred),
+      m_liveQueue.end());
+    m_backgroundQueue.erase(std::remove_if(m_backgroundQueue.begin(), m_backgroundQueue.end(), pred),
+      m_backgroundQueue.end());
   }
 
 
   void DxvkPipelineCompiler::removePipeline(DxvkComputePipeline* pipeline) {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_queuedComputePipelines.erase(pipeline);
+
+    auto pred = [pipeline](const DxvkPipelineEntry& e) { return e.computePipeline == pipeline; };
+    m_liveQueue.erase(std::remove_if(m_liveQueue.begin(), m_liveQueue.end(), pred),
+      m_liveQueue.end());
+    m_backgroundQueue.erase(std::remove_if(m_backgroundQueue.begin(), m_backgroundQueue.end(), pred),
+      m_backgroundQueue.end());
   }
 
 
@@ -217,8 +212,13 @@ namespace dxvk {
 
 
   bool DxvkPipelineCompiler::waitForWork(DxvkPipelineEntry& entry) {
-    thread_local uint32_t s_pick = 0;
+    static std::atomic<uint32_t> s_next_pick = 1;
+    thread_local uint32_t s_pick = s_next_pick.fetch_add(1, std::memory_order_relaxed);
+    thread_local uint32_t s_starvation_counter = 0;
     uint32_t pick = s_pick++;
+
+    bool preferBg = prefer_background(pick)
+                 || s_starvation_counter >= DYASYNC_BACKGROUND_INTERVAL * 3;
 
     std::unique_lock<std::mutex> lock(m_mutex);
 
@@ -229,7 +229,15 @@ namespace dxvk {
     if (m_stop)
       return false;
 
-    return this->takeEntry(entry, prefer_background(pick));
+    if (!this->takeEntry(entry, preferBg))
+      return false;
+
+    if (entry.priority != DxvkPipelinePriority::Low && !m_backgroundQueue.empty())
+      s_starvation_counter++;
+    else
+      s_starvation_counter = 0;
+
+    return true;
   }
 
 

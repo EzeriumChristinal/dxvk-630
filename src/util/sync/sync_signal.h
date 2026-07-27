@@ -170,6 +170,11 @@ namespace dxvk::sync {
       });
     }
 
+    void clearCallbacks() {
+      std::lock_guard<dxvk::mutex> lock(m_mutex);
+      m_callbacks.clear();
+    }
+
     template<typename Fn>
     void setCallback(uint64_t value, Fn&& proc) {
       if (value <= this->value()) {

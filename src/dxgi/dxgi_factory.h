@@ -202,6 +202,9 @@ namespace dxvk {
 
     D3DDestructionNotifier m_destructionNotifier;
 
+    uint32_t              m_adapterCount = 0;
+    uint64_t              m_adapterHash  = 0;
+
     HWND   m_windowAssociation = nullptr;
     UINT   m_windowAssociationFlags = 0;
       

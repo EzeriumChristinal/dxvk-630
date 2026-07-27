@@ -74,8 +74,6 @@ namespace dxvk {
 
     bool pushEntry(DxvkPipelineEntry&& entry);
 
-    void notifyIfPushed(bool pushed);
-
     bool takeEntry(DxvkPipelineEntry& entry, bool preferBackground);
 
     bool waitForWork(DxvkPipelineEntry& entry);

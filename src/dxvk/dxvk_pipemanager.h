@@ -313,7 +313,7 @@ namespace dxvk {
       DxvkPipelineLayout,
       DxvkHash, DxvkEq> m_pipelineLayouts;
 
-    dxvk::mutex m_pipelineMutex;
+    dxvk::mutex               m_pipelineMutex;
 
     std::unordered_map<
       DxvkGraphicsPipelineVertexInputState,
@@ -330,11 +330,13 @@ namespace dxvk {
       DxvkShaderPipelineLibrary,
       DxvkHash, DxvkEq> m_shaderLibraries;
 
+    dxvk::mutex               m_computeMutex;
     std::unordered_map<
       DxvkComputePipelineShaders,
       DxvkComputePipeline,
       DxvkHash, DxvkEq> m_computePipelines;
 
+    dxvk::mutex               m_graphicsMutex;
     std::unordered_map<
       DxvkGraphicsPipelineShaders,
       DxvkGraphicsPipeline,

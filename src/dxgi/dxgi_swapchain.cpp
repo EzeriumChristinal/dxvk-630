@@ -349,6 +349,10 @@ namespace dxvk {
     if (SyncInterval > 4)
       return DXGI_ERROR_INVALID_CALL;
 
+    DXGI_PRESENT_PARAMETERS emptyParams = {};
+    if (!pPresentParameters)
+      pPresentParameters = &emptyParams;
+
     if ((m_desc.SwapEffect == DXGI_SWAP_EFFECT_DISCARD || m_desc.SwapEffect == DXGI_SWAP_EFFECT_SEQUENTIAL) && wsi::isMinimized(m_window))
       return DXGI_STATUS_OCCLUDED;
     bool occluded = !m_descFs.Windowed && wsi::isOccluded(m_window) && !wsi::isMinimized(m_window);

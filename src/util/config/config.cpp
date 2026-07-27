@@ -1505,9 +1505,6 @@ namespace dxvk {
     if (n < line.size() && line[n] == '[') {
       n += 1;
 
-      if (line.empty())
-        return;
-
       size_t e = line.size() - 1;
       while (e > n && line[e] != ']')
         e -= 1;
@@ -1647,7 +1644,7 @@ namespace dxvk {
         return false;
     }
 
-    // Parse integer part
+    // Parse integer part (guard against uint64_t overflow)
     uint64_t intPart = 0;
 
     if (value[pos] == '.')
@@ -1663,16 +1660,21 @@ namespace dxvk {
       if (value[pos] < '0' || value[pos] > '9')
         return false;
 
-      intPart *= 10;
-      intPart += value[pos] - '0';
+      uint64_t digit = value[pos] - '0';
+
+      if (intPart > (UINT64_MAX - digit) / 10)
+        return false;
+
+      intPart = intPart * 10 + digit;
       pos += 1;
     }
 
-    // Parse fractional part
+    // Parse fractional part (max 19 digits to avoid uint64_t overflow)
     uint64_t fractPart = 0;
     uint64_t fractDivisor = 1;
+    uint32_t fractDigits = 0;
 
-    while (pos < value.size()) {
+    while (pos < value.size() && fractDigits < 19) {
       if (value[pos] < '0' || value[pos] > '9')
         return false;
 
@@ -1680,7 +1682,12 @@ namespace dxvk {
       fractPart *= 10;
       fractPart += value[pos] - '0';
       pos += 1;
+      fractDigits += 1;
     }
+
+    // Skip any remaining fractional digits (precision loss is acceptable)
+    while (pos < value.size() && value[pos] >= '0' && value[pos] <= '9')
+      pos += 1;
 
     // Compute final number, not super accurate but this should do
     result = float((double(fractPart) / double(fractDivisor)) + double(intPart));

@@ -38,7 +38,7 @@ namespace dxvk {
         return refCount;
       }
 
-      return ~0u;
+      return 0;
     }
 
     HRESULT STDMETHODCALLTYPE QueryInterface(

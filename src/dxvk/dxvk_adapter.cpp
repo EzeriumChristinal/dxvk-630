@@ -401,7 +401,12 @@ namespace dxvk {
         || (id >= 0x5900 && id <= 0x593F)
         || (id >= 0x87C0 && id <= 0x87CF)
         || (id >= 0x9B00 && id <= 0x9BFF)
-        || (id >= 0x3184 && id <= 0x3185);
+        || (id >= 0x3184 && id <= 0x3185)
+        || (id >= 0x2200 && id <= 0x22FF)
+        || (id >= 0x5A80 && id <= 0x5A8F)
+        || (id >= 0x5A40 && id <= 0x5A4F)
+        || id == 0x0A84
+        || id == 0x1A84;
   }
 
 }

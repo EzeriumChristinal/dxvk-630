@@ -203,9 +203,9 @@ Target: Intel UHD 630 (Gen9.5, vendor=0x8086, EUs≤24, shared mem)
   Call endFrame() with CallbackFence GPU signal for low-latency modes.
   getEffectiveFrameLatency() → clamp to 1 for low-latency modes.
 
-- [ ] **T6.4: Wire framepacer into D3D9 swapchain**
+- [x] **T6.4: Wire framepacer into D3D9 swapchain**
   Files: `src/d3d9/d3d9_swapchain.cpp`
-  Same as T6.3 but for D3D9 path.
+  Same as T6.3 but for D3D9 path. `m_framePacer` member, `beginFrame()` in Present, `endFrame()` in CS lambda, `getEffectiveFrameLatency()` in GetActualFrameLatency.
 
 ---
 
@@ -223,6 +223,8 @@ Target: Intel UHD 630 (Gen9.5, vendor=0x8086, EUs≤24, shared mem)
   Verify: DXVK init succeeds on target hardware (UHD 630).
   Check log: No "Device does not support Vulkan 1.3" error.
   Check log: "DXVK: Intel Gen9 low-power profile active" (if Gen9 detected).
+  Build verified: 124/124 targets, 5 DLLs (d3d8/d3d9/d3d10core/d3d11/dxgi) linked clean.
+  Requires: Gen9 hardware for runtime verification.
 
 ---
 

@@ -503,7 +503,8 @@ namespace dxvk {
 
       if (j > i + 1) {
         VkImageMemoryBarrier2 merged = v[i];
-        merged.subresourceRange.levelCount += v[j - 1].subresourceRange.baseMipLevel - v[i].subresourceRange.baseMipLevel;
+        uint32_t rangeEnd = v[j - 1].subresourceRange.baseMipLevel + v[j - 1].subresourceRange.levelCount;
+        merged.subresourceRange.levelCount = rangeEnd - v[i].subresourceRange.baseMipLevel;
         v[writeIdx++] = merged;
       } else {
         v[writeIdx++] = v[i];
@@ -520,7 +521,7 @@ namespace dxvk {
     const Rc<DxvkCommandList>&        list) {
     VkDependencyInfo depInfo = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
 
-    if (m_memoryBarrier.srcStageMask | m_memoryBarrier.dstStageMask) {
+    if (m_memoryBarrier.srcStageMask || m_memoryBarrier.dstStageMask) {
       depInfo.memoryBarrierCount = 1;
       depInfo.pMemoryBarriers = &m_memoryBarrier;
     }
@@ -531,7 +532,7 @@ namespace dxvk {
       depInfo.pImageMemoryBarriers = m_imageBarriers.data();
     }
 
-    if (!(depInfo.memoryBarrierCount | depInfo.imageMemoryBarrierCount))
+    if (!depInfo.memoryBarrierCount && !depInfo.imageMemoryBarrierCount)
       return;
 
     list->cmdPipelineBarrier(m_cmdBuffer, &depInfo);

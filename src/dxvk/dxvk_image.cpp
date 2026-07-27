@@ -53,7 +53,8 @@ namespace dxvk {
 
 
   HRESULT DxvkKeyedMutex::AcquireSync(UINT64 key, DWORD  milliseconds) {
-    if (m_owned.load(std::memory_order_acquire))
+    bool expected = false;
+    if (!m_owned.compare_exchange_strong(expected, true, std::memory_order_acquire))
       return DXGI_ERROR_INVALID_CALL;
 
     LARGE_INTEGER timeout = { };
@@ -64,10 +65,14 @@ namespace dxvk {
     timeout.QuadPart = milliseconds * -10000;
 
     NTSTATUS status = D3DKMTAcquireKeyedMutex(&acquire);
-    if (status == STATUS_TIMEOUT)
+    if (status == STATUS_TIMEOUT) {
+      m_owned.store(false, std::memory_order_release);
       return WAIT_TIMEOUT;
-    if (status)
+    }
+    if (status) {
+      m_owned.store(false, std::memory_order_release);
       return DXGI_ERROR_INVALID_CALL;
+    }
 
     VkSemaphore semaphore = m_fence->handle();
     VkSemaphoreWaitInfo info = { VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO };
@@ -77,11 +82,11 @@ namespace dxvk {
 
     if (m_vkd->vkWaitSemaphores(m_vkd->device(), &info, -1)) {
       Logger::warn("DxvkKeyedMutex::AcquireSync: Failed to wait semaphore");
+      m_owned.store(false, std::memory_order_release);
       return DXGI_ERROR_INVALID_CALL;
     }
 
     m_fenceValue = acquire.FenceValue;
-    m_owned.store(true, std::memory_order_release);
     return S_OK;
   }
 

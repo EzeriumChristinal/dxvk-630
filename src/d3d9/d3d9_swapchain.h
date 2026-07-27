@@ -8,6 +8,8 @@
 
 #include "../dxvk/dxvk_swapchain_blitter.h"
 
+#include "../dxvk/framepacer/dxvk_framepacer.h"
+
 #include "../util/sync/sync_signal.h"
 
 #include "../wsi/wsi_window.h"
@@ -185,6 +187,8 @@ namespace dxvk {
     Rc<hud::HudLatencyItem>   m_latencyHud;
 
     std::optional<VkHdrMetadataEXT> m_hdrMetadata;
+
+    std::unique_ptr<FramePacer> m_framePacer;
 
     D3D9VkExtSwapchain m_swapchainExt;
 

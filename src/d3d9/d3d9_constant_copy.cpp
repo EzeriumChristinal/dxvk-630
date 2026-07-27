@@ -342,15 +342,21 @@ namespace dxvk {
 
 
   void D3D9ConstantBufferCopy::writeIntRange(const D3D9ConstantBufferCopyArgs& args, const D3D9ConstantRange& range) const {
+    uint32_t count = std::min<uint32_t>(range.count,
+      uint32_t((args.intBufferSize - range.dstIndex * sizeof(Vector4i)) / sizeof(Vector4i)));
+
+    if (!count)
+      return;
+
     #if defined(DXVK_ARCH_X86) && (defined(__GNUC__) || defined(__clang__) || defined(_MSC_VER))
     auto dstPtr = reinterpret_cast<      __m128i*>(args.intBuffer) + range.dstIndex;
     auto srcPtr = reinterpret_cast<const __m128i*>(args.constIntApi) + range.srcIndex;
 
-    for (uint32_t i = 0u; i < range.count; i++)
+    for (uint32_t i = 0u; i < count; i++)
       _mm_stream_si128(dstPtr + i, _mm_loadu_si128(srcPtr + i));
     #else
     std::memcpy(reinterpret_cast<Vector4i*>(args.intBuffer) + range.dstIndex,
-      args.constIntApi + range.srcIndex, range.count * sizeof(Vector4i));
+      args.constIntApi + range.srcIndex, count * sizeof(Vector4i));
     #endif
   }
 
@@ -366,17 +372,23 @@ namespace dxvk {
 
 
   void D3D9ConstantBufferCopy::writeBoolRange(const D3D9ConstantBufferCopyArgs& args, const D3D9ConstantRange& range) const {
+    uint32_t count = std::min<uint32_t>(range.count,
+      uint32_t((args.boolBufferSize - range.dstIndex * sizeof(uint32_t)) / sizeof(uint32_t)));
+
+    if (!count)
+      return;
+
     #if defined(DXVK_ARCH_X86) && (defined(__GNUC__) || defined(__clang__) || defined(_MSC_VER))
     auto dstPtr = reinterpret_cast<      int*>(args.boolBuffer) + range.dstIndex;
     auto srcPtr = reinterpret_cast<const int*>(args.constBoolApi) + range.srcIndex;
 
-    for (uint32_t i = 0u; i < range.count; i += 4u) {
+    for (uint32_t i = 0u; i < count; i += 4u) {
       auto data = _mm_loadu_si128(reinterpret_cast<const __m128i*>(srcPtr + i));
       _mm_stream_si128(reinterpret_cast<__m128i*>(dstPtr + i), data);
     }
     #else
     std::memcpy(reinterpret_cast<uint32_t*>(args.boolBuffer) + range.dstIndex,
-      args.constBoolApi + range.srcIndex, range.count * sizeof(uint32_t));
+      args.constBoolApi + range.srcIndex, count * sizeof(uint32_t));
     #endif
   }
 

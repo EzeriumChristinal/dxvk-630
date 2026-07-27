@@ -202,7 +202,7 @@ namespace dxvk {
     if (shaders.cs == nullptr)
       return nullptr;
     
-    std::lock_guard<dxvk::mutex> lock(m_pipelineMutex);
+    std::lock_guard<dxvk::mutex> lock(m_computeMutex);
     
     auto pair = m_computePipelines.find(shaders);
     if (pair != m_computePipelines.end())
@@ -211,7 +211,11 @@ namespace dxvk {
     DxvkShaderPipelineLibraryKey key;
     key.addShader(shaders.cs);
 
-    auto library = findPipelineLibraryLocked(key);
+    DxvkShaderPipelineLibrary* library;
+    {
+      std::lock_guard<dxvk::mutex> libLock(m_pipelineMutex);
+      library = findPipelineLibraryLocked(key);
+    }
 
     auto iter = m_computePipelines.emplace(
       std::piecewise_construct,
@@ -226,7 +230,7 @@ namespace dxvk {
     if (shaders.vs == nullptr)
       return nullptr;
     
-    std::lock_guard<dxvk::mutex> lock(m_pipelineMutex);
+    std::lock_guard<dxvk::mutex> lock(m_graphicsMutex);
 
     auto pair = m_graphicsPipelines.find(shaders);
     if (pair != m_graphicsPipelines.end())
@@ -239,22 +243,22 @@ namespace dxvk {
     if (shaders.tes != nullptr) vsKey.addShader(shaders.tes);
     if (shaders.gs  != nullptr) vsKey.addShader(shaders.gs);
 
-    DxvkShaderPipelineLibrary* vsLibrary = findPipelineLibraryLocked(vsKey);
+    DxvkShaderPipelineLibrary* vsLibrary;
+    DxvkShaderPipelineLibrary* fsLibrary;
+    {
+      std::lock_guard<dxvk::mutex> libLock(m_pipelineMutex);
+      vsLibrary = findPipelineLibraryLocked(vsKey);
 
-    if (!vsLibrary) {
-      // If multiple shader stages are participating, create a
-      // pipeline library so that it can potentially be reused.
-      // Don't dispatch the pipeline library to a worker thread
-      // since it should be compiled on demand anyway.
-      vsLibrary = createPipelineLibraryLocked(vsKey);
+      if (!vsLibrary) {
+        vsLibrary = createPipelineLibraryLocked(vsKey);
+      }
+
+      DxvkShaderPipelineLibraryKey fsKey;
+      if (shaders.fs != nullptr)
+        fsKey.addShader(shaders.fs);
+
+      fsLibrary = findPipelineLibraryLocked(fsKey);
     }
-
-    DxvkShaderPipelineLibraryKey fsKey;
-
-    if (shaders.fs != nullptr)
-      fsKey.addShader(shaders.fs);
-
-    DxvkShaderPipelineLibrary* fsLibrary = findPipelineLibraryLocked(fsKey);
 
     auto iter = m_graphicsPipelines.emplace(
       std::piecewise_construct,

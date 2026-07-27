@@ -1610,8 +1610,10 @@ namespace dxvk {
         }
 
         D3D11_COMMON_TEXTURE_DESC desc = { };
-        if (!ConvertRuntimeDescriptor(query.PrivateRuntimeDataSize, d3dkmt, &desc))
+        if (!ConvertRuntimeDescriptor(query.PrivateRuntimeDataSize, d3dkmt, &desc)) {
+          CloseHandle(hResource);
           return E_INVALIDARG;
+        }
 
         try {
           const Com<D3D11Texture2D> texture = new D3D11Texture2D(this, &desc, nullptr, hResource);
@@ -1621,6 +1623,7 @@ namespace dxvk {
         }
         catch (const DxvkError& e) {
           Logger::err(e.message());
+          CloseHandle(hResource);
           return E_INVALIDARG;
         }
       }
