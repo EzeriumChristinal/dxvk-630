@@ -129,7 +129,7 @@ namespace dxvk {
     struct PipelineBucket {
       dxvk::condition_variable  cond;
       std::queue<PipelineEntry> queue;
-      uint32_t                  idleWorkers = 0;
+      std::atomic<uint32_t>     idleWorkers = { 0u };
     };
 
     DxvkDevice*                       m_device;

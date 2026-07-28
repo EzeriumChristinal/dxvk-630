@@ -424,6 +424,10 @@ namespace dxvk {
       m_initializer->FlushCsChunk();
     }
 
+    bool HasPendingInitCommands() const {
+      return m_initializer->HasPendingCs();
+    }
+
     void NotifyContextFlush() {
       m_initializer->NotifyContextFlush();
     }

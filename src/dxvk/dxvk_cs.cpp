@@ -91,7 +91,11 @@ namespace dxvk {
     chunk->reset();
     
     std::lock_guard<dxvk::mutex> lock(m_mutex);
-    m_chunks.push_back(chunk);
+    
+    if (m_chunks.size() < MaxCachedChunks)
+      m_chunks.push_back(chunk);
+    else
+      delete chunk;
   }
   
   

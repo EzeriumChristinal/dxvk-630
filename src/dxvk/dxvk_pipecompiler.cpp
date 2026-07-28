@@ -222,7 +222,7 @@ namespace dxvk {
 
     std::unique_lock<std::mutex> lock(m_mutex);
 
-    m_cond.wait_for(lock, std::chrono::milliseconds(16), [this] {
+    m_cond.wait(lock, [this] {
       return work_available(m_stop, m_liveQueue, m_backgroundQueue);
     });
 

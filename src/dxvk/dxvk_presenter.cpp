@@ -223,6 +223,11 @@ namespace dxvk {
 
       if (m_hasGamescopeFenceSignalBug)
         currSync.fenceSignaled = status >= 0;
+
+      if (currSync.fenceSignaled) {
+        m_lastPresentFence = currSync.fence;
+        m_lastPresentFenceFrameId = frameId;
+      }
     }
 
     if (status >= 0) {
@@ -290,6 +295,13 @@ namespace dxvk {
       if (canSignal)
         m_signal->signal(frameId);
     } else {
+      if (m_hasSwapchainMaintenance1 && m_lastPresentFence && m_lastPresentFenceFrameId == frameId) {
+        VkResult vr = m_vkd->vkWaitForFences(m_vkd->device(),
+          1, &m_lastPresentFence, VK_TRUE, ~0ull);
+        if (vr)
+          Logger::err(str::format("Presenter: Failed to wait for present fence: ", vr));
+      }
+
       m_fpsLimiter.delay();
       m_signal->signal(frameId);
 

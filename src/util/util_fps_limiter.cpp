@@ -67,9 +67,11 @@ namespace dxvk {
     if (t1 < m_nextFrame)
       Sleep::sleepUntil(t1, m_nextFrame);
 
+    lock.lock();
     m_nextFrame = (t1 < m_nextFrame + interval)
       ? m_nextFrame + interval
       : t1 + interval;
+    lock.unlock();
   }
 
 

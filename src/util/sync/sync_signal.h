@@ -3,6 +3,7 @@
 #include <atomic>
 #include <functional>
 #include <list>
+#include <vector>
 
 #include "../rc/util_rc.h"
 
@@ -146,18 +147,25 @@ namespace dxvk::sync {
     }
 
     void signal(uint64_t value) {
-      std::unique_lock<dxvk::mutex> lock(m_mutex);
-      m_value.store(value, std::memory_order_release);
-      m_cond.notify_all();
+      std::vector<std::function<void ()>> toFire;
 
-      for (auto i = m_callbacks.begin(); i != m_callbacks.end(); ) {
-        if (value >= i->first) {
-          i->second();
-          i = m_callbacks.erase(i);
-        } else {
-          i++;
+      {
+        std::unique_lock<dxvk::mutex> lock(m_mutex);
+        m_value.store(value, std::memory_order_release);
+        m_cond.notify_all();
+
+        for (auto i = m_callbacks.begin(); i != m_callbacks.end(); ) {
+          if (value >= i->first) {
+            toFire.push_back(std::move(i->second));
+            i = m_callbacks.erase(i);
+          } else {
+            i++;
+          }
         }
       }
+
+      for (auto& cb : toFire)
+        cb();
     }
 
     void wait(uint64_t value) {

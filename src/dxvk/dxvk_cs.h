@@ -387,6 +387,8 @@ namespace dxvk {
     void freeChunk(DxvkCsChunk* chunk);
     
   private:
+
+    static constexpr size_t MaxCachedChunks = 128u;
     
     dxvk::mutex               m_mutex;
     std::vector<DxvkCsChunk*> m_chunks;

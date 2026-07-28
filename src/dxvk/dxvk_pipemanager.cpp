@@ -67,12 +67,14 @@ namespace dxvk {
   void DxvkPipelineWorkers::notifyWorkers(DxvkPipelinePriority priority) {
     uint32_t index = uint32_t(priority);
 
-    // If any workers are idle in a suitable set, notify the corresponding
-    // condition variable. If all workers are busy anyway, we know that the
-    // job is going to be picked up at some point anyway.
     for (uint32_t i = index; i < m_buckets.size(); i++) {
-      if (m_buckets[i].idleWorkers) {
-        m_buckets[i].cond.notify_one();
+      uint32_t idle = m_buckets[i].idleWorkers.load(std::memory_order_relaxed);
+
+      if (idle) {
+        if (m_buckets[i].queue.size() > idle)
+          m_buckets[i].cond.notify_all();
+        else
+          m_buckets[i].cond.notify_one();
         break;
       }
     }
@@ -80,32 +82,35 @@ namespace dxvk {
 
 
   void DxvkPipelineWorkers::startWorkers() {
-    if (!m_workersRunning.exchange(true)) {
-      // Determine number of available CPU cores, and clamp to a useful
-      // range. DXVK is not tested on extremely high core counts, and
-      // parallelism may be limited past a certain point.
-      uint32_t coreCount = dxvk::thread::hardware_concurrency();
-      coreCount = std::clamp(coreCount, 1u, 64u);
+    if (m_workersRunning.exchange(true))
+      return;
 
-      if (m_device->config().numCompilerThreads > 0)
-        coreCount = m_device->config().numCompilerThreads;
+    // Determine number of available CPU cores, and clamp to a useful
+    // range. DXVK is not tested on extremely high core counts, and
+    // parallelism may be limited past a certain point.
+    uint32_t coreCount = dxvk::thread::hardware_concurrency();
+    coreCount = std::clamp(coreCount, 1u, 64u);
 
-      // Reduce worker count on 32-bit to save adderss space
-      uint32_t workerCount = coreCount;
+    if (m_device->config().numCompilerThreads > 0)
+      coreCount = m_device->config().numCompilerThreads;
 
-      if (env::is32BitHostPlatform())
-        workerCount = std::min(workerCount, 8u);
+    // Reduce worker count on 32-bit to save address space
+    uint32_t workerCount = coreCount;
 
-      // Number of workers that can process pipeline pipelines with normal
-      // priority. Any other workers can only build high-priority pipelines.
-      // Base this on the available core count, not the worker count, since
-      // that is what determines the impact of having multiple threads do
-      // heavy CPU work.
-      uint32_t npWorkerCount = std::clamp(((coreCount - 1) * 5) / 7, 1u, workerCount);
-      uint32_t lpWorkerCount = std::clamp(((coreCount - 1) * 2) / 7, 1u, workerCount);
+    if (env::is32BitHostPlatform())
+      workerCount = std::min(workerCount, 8u);
 
-      m_workers.reserve(workerCount);
+    // Number of workers that can process pipeline pipelines with normal
+    // priority. Any other workers can only build high-priority pipelines.
+    // Base this on the available core count, not the worker count, since
+    // that is what determines the impact of having multiple threads do
+    // heavy CPU work.
+    uint32_t npWorkerCount = std::clamp(((coreCount - 1) * 5) / 7, 1u, workerCount);
+    uint32_t lpWorkerCount = std::clamp(((coreCount - 1) * 2) / 7, 1u, workerCount);
 
+    m_workers.reserve(workerCount);
+
+    try {
       for (size_t i = 0; i < workerCount; i++) {
         DxvkPipelinePriority priority = DxvkPipelinePriority::Normal;
 
@@ -120,9 +125,17 @@ namespace dxvk {
         
         worker.set_priority(ThreadPriority::Lowest);
       }
-
-      Logger::info(str::format("DXVK: Using ", workerCount, " compiler threads"));
+    } catch (...) {
+      m_workersRunning.store(false);
+      for (auto& worker : m_workers) {
+        if (worker.joinable())
+          worker.join();
+      }
+      m_workers.clear();
+      throw;
     }
+
+    Logger::info(str::format("DXVK: Using ", workerCount, " compiler threads"));
   }
 
 

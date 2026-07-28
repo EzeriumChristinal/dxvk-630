@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "../dxvk/dxvk_staging.h"
 
 #include "d3d11_buffer.h"
@@ -39,7 +41,14 @@ namespace dxvk {
     
     ~D3D11Initializer();
 
+    bool HasPendingCs() const {
+      return m_hasPendingCs.load(std::memory_order_acquire);
+    }
+
     void FlushCsChunk() {
+      if (!m_hasPendingCs.load(std::memory_order_acquire))
+        return;
+
       std::lock_guard<dxvk::mutex> lock(m_csMutex);
 
       if (!m_csChunk->empty())
@@ -79,6 +88,8 @@ namespace dxvk {
     dxvk::mutex       m_csMutex;
     DxvkCsChunkRef    m_csChunk;
 
+    std::atomic<bool> m_hasPendingCs = { false };
+
     void InitDeviceLocalBuffer(
             D3D11Buffer*                pBuffer,
       const D3D11_SUBRESOURCE_DATA*     pInitialData);
@@ -117,9 +128,10 @@ namespace dxvk {
 
       if (unlikely(!m_csChunk->push(command))) {
         FlushCsChunkLocked();
-
         m_csChunk->push(command);
       }
+
+      m_hasPendingCs.store(true, std::memory_order_release);
     }
 
   };

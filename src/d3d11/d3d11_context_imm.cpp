@@ -942,9 +942,8 @@ namespace dxvk {
 
 
   void D3D11ImmediateContext::EmitCsChunk(DxvkCsChunkRef&& chunk) {
-    // Flush init commands so that the CS thread
-    // can processe them before the first use.
-    m_parent->FlushInitCommands();
+    if (m_parent->HasPendingInitCommands())
+      m_parent->FlushInitCommands();
 
     m_csSeqNum = m_csThread.dispatchChunk(std::move(chunk));
   }

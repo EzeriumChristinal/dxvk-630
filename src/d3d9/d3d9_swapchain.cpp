@@ -162,25 +162,6 @@ namespace dxvk {
     UpdatePresentRegion(pSourceRect, pDestRect);
     UpdatePresentParameters();
 
-    if (!SwapWithFrontBuffer() && m_parent->GetOptions()->extraFrontbuffer) {
-      // We never actually rotate in the front buffer.
-      // Just blit to it for GetFrontBufferData.
-
-      // When we have multiple buffers, the last buffer always acts as the front buffer.
-      // (See comment in PresentImage for an explaination why.)
-      // Games with a buffer count of 1 rely on the contents of the previous frame still
-      // being there, so we can't just add another buffer to the rotation.
-      // At the same time, they could call GetFrontBufferData after already rendering to the backbuffer.
-      // So we have to do a copy of the backbuffer that will be copied to the Vulkan backbuffer
-      // and keep that around for the next frame.
-
-      const auto& backbuffer = m_backBuffers[0];
-      const auto& frontbuffer = GetFrontBuffer();
-      if (FAILED(m_parent->StretchRect(backbuffer.ptr(), nullptr, frontbuffer.ptr(), nullptr, D3DTEXF_NONE))) {
-        Logger::err("Failed to blit to front buffer");
-      }
-    }
-
 #ifdef _WIN32
     const bool useGDIFallback = m_partialCopy && !SwapWithFrontBuffer();
     if (useGDIFallback)
@@ -247,6 +228,13 @@ namespace dxvk {
 
   HRESULT STDMETHODCALLTYPE D3D9SwapChainEx::GetFrontBufferData(IDirect3DSurface9* pDestSurface) {
     D3D9DeviceLock lock = m_parent->LockDevice();
+
+    if (!SwapWithFrontBuffer() && m_parent->GetOptions()->extraFrontbuffer) {
+      const auto& backbuffer = m_backBuffers[0];
+      const auto& frontbuffer = GetFrontBuffer();
+      if (FAILED(m_parent->StretchRect(backbuffer.ptr(), nullptr, frontbuffer.ptr(), nullptr, D3DTEXF_NONE)))
+        Logger::err("Failed to blit to front buffer");
+    }
 
     // This function can do absolutely everything!
     // Copies the front buffer between formats with an implicit resolve.

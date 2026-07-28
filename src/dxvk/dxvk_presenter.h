@@ -345,6 +345,9 @@ namespace dxvk {
 
     bool                        m_hasGamescopeFenceSignalBug = false;
 
+    VkFence                     m_lastPresentFence = VK_NULL_HANDLE;
+    uint64_t                    m_lastPresentFenceFrameId = 0u;
+
     static const std::array<std::pair<VkColorSpaceKHR, VkColorSpaceKHR>, 2> s_colorSpaceFallbacks;
 
     void updateSwapChain();
