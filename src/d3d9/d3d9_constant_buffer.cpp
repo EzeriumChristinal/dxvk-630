@@ -35,7 +35,16 @@ namespace dxvk {
     size = align(size, m_align);
 
     if (m_offset + size > m_size) {
-      m_cpuSlice = m_cpuBuffer->allocateStorage();
+      m_ringIndex = (m_ringIndex + 1) % RingSlotCount;
+      auto& slot = m_ringSlots[m_ringIndex];
+
+      if (slot.used) {
+        m_cpuSlice = slot.slice;
+      } else {
+        m_cpuSlice = m_cpuBuffer->allocateStorage();
+        slot.slice = m_cpuSlice;
+        slot.used = true;
+      }
 
       m_device->EmitCs([
         cBinding    = uint32_t(m_kind),

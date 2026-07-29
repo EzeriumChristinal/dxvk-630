@@ -85,9 +85,9 @@ namespace dxvk {
   : m_lowLatencyOffsetUs(clamp_low_latency_offset(options.lowLatencyOffset)) {
     auto envValue = env::getEnvVar(FRAME_PACE_ENV_VAR);
 
-    m_mode = parse_frame_pace(envValue.empty() ? options.framePace : envValue);
+    m_mode.store(parse_frame_pace(envValue.empty() ? options.framePace : envValue));
 
-    switch (m_mode) {
+    switch (m_mode.load()) {
       case DxvkFramePace::MaxFrameLatency:
         break;
 
@@ -111,7 +111,7 @@ namespace dxvk {
 
 
   uint32_t FramePacer::getEffectiveFrameLatency(uint32_t configuredLatency) const {
-    switch (m_mode) {
+    switch (m_mode.load()) {
       case DxvkFramePace::MaxFrameLatency: return configuredLatency;
       case DxvkFramePace::LowLatency:      return std::min(configuredLatency, MIN_FRAME_LATENCY);
       case DxvkFramePace::MinLatency:      return std::min(configuredLatency, MIN_FRAME_LATENCY);
@@ -125,14 +125,22 @@ namespace dxvk {
     std::optional<std::chrono::high_resolution_clock::time_point> wakeTime;
     {
       std::lock_guard<std::mutex> lock(m_frameStartMutex);
-      wakeTime = predict_wake_time(m_mode, m_lastFrameStart,
+      wakeTime = predict_wake_time(m_mode.load(), m_lastFrameStart,
         m_avgFrameDurationUs.load(), m_lowLatencyOffsetUs);
     }
 
     if (wakeTime.has_value()) {
       auto target = *wakeTime;
-      while (std::chrono::high_resolution_clock::now() < target)
+      auto minWait = std::chrono::microseconds(100);
+      while (true) {
+        auto now = std::chrono::high_resolution_clock::now();
+        if (now >= target)
+          break;
+        auto remaining = std::chrono::duration_cast<std::chrono::microseconds>(target - now);
+        if (remaining < minWait)
+          break;
         std::this_thread::sleep_until(target);
+      }
     }
 
     {
@@ -143,7 +151,7 @@ namespace dxvk {
 
 
   void FramePacer::endFrame(uint64_t frameId) {
-    if (m_mode != DxvkFramePace::LowLatency)
+    if (m_mode.load() != DxvkFramePace::LowLatency)
       return;
 
     std::optional<std::chrono::high_resolution_clock::time_point> frameStart;
@@ -163,7 +171,11 @@ namespace dxvk {
     auto elapsedUs = int32_t(std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::high_resolution_clock::now() - frameStart).count());
 
-    m_avgFrameDurationUs.store(blend_frame_duration(m_avgFrameDurationUs.load(), elapsedUs));
+    int32_t expected = m_avgFrameDurationUs.load();
+    int32_t desired;
+    do {
+      desired = blend_frame_duration(expected, elapsedUs);
+    } while (!m_avgFrameDurationUs.compare_exchange_weak(expected, desired));
   }
 
 }

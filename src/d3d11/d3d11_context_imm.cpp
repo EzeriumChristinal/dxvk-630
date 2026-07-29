@@ -747,15 +747,21 @@ namespace dxvk {
     void* mapPtr = nullptr;
 
     if (likely(CopyFlags != D3D11_COPY_NO_OVERWRITE)) {
-      auto bufferSlice = pDstBuffer->DiscardSlice(&m_allocationCache);
-      mapPtr = bufferSlice->mapPtr();
+      auto buffer = pDstBuffer->GetBuffer();
 
-      EmitCs([
-        cBuffer      = pDstBuffer->GetBuffer(),
-        cBufferSlice = std::move(bufferSlice)
-      ] (DxvkContext* ctx) mutable {
-        ctx->invalidateBuffer(cBuffer, std::move(cBufferSlice));
-      });
+      if (buffer->isInUse(DxvkAccess::Write) || buffer->isInUse(DxvkAccess::Read)) {
+        auto bufferSlice = pDstBuffer->DiscardSlice(&m_allocationCache);
+        mapPtr = bufferSlice->mapPtr();
+
+        EmitCs([
+          cBuffer      = std::move(buffer),
+          cBufferSlice = std::move(bufferSlice)
+        ] (DxvkContext* ctx) mutable {
+          ctx->invalidateBuffer(cBuffer, std::move(cBufferSlice));
+        });
+      } else {
+        mapPtr = pDstBuffer->GetMapPtr();
+      }
     } else {
       mapPtr = pDstBuffer->GetMapPtr();
     }
@@ -1092,8 +1098,11 @@ namespace dxvk {
       m_submitStatus.result = VK_NOT_READY;
 
     // Exit early if there's nothing to do
-    if (!GetPendingCsChunks() && !hEvent)
+    if (!GetPendingCsChunks()) {
+      if (hEvent)
+        SetEvent(hEvent);
       return;
+    }
 
     m_hasPendingUnresolvedPass = false;
 

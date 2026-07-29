@@ -1797,10 +1797,12 @@ namespace dxvk {
         return GetFormatSupportFlags(info->InFormat, nullptr, &info->OutFormatSupport2);
       } return S_OK;
 
-      default:
+      default: {
         // For everything else, we can use the device feature struct
         // that we already initialized during device creation.
+        std::lock_guard<dxvk::mutex> lock{ m_featureLevelLock };
         return m_deviceFeatures.GetFeatureData(Feature, FeatureSupportDataSize, pFeatureSupportData);
+      }
     }
   }
   

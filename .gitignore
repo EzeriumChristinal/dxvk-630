@@ -1,6 +1,10 @@
+build/
 build-debug/
 build-release/
+build-msvc-x86/
+build-msvc-x64/
 dxvk-venv/
+AgentLog/
 *.o
 *.obj
 *.a
@@ -15,7 +19,16 @@ dxvk-venv/
 *.swp
 *.swo
 *~
+*.7z
+*.zip
+*.tar.gz
+*.log
+*.pyc
+__pycache__/
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
 compile_commands.json
 .clangd
+WORK_PLAN.md

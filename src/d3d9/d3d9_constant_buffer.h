@@ -17,8 +17,14 @@ namespace dxvk {
   class D3D9ConstantBuffer {
     static constexpr VkDeviceSize ShaderConstSize = 1024ull << 10;
     static constexpr VkDeviceSize MiscSize        =   64ull << 10;
+    static constexpr uint32_t     RingSlotCount   = 4u;
 
     using Kind = D3D9ShaderResourceMapping::CbvIndex;
+
+    struct RingSlot {
+      Rc<DxvkResourceAllocation> slice;
+      bool                       used = false;
+    };
   public:
 
     struct StreamCommand {
@@ -96,6 +102,9 @@ namespace dxvk {
     Rc<DxvkResourceAllocation> m_cpuSlice = nullptr;
 
     StreamCommand*        m_streamCmd = nullptr;
+
+    std::array<RingSlot, RingSlotCount> m_ringSlots;
+    uint32_t              m_ringIndex  = 0u;
 
     Rc<DxvkResourceAllocation> CreateBuffer();
 

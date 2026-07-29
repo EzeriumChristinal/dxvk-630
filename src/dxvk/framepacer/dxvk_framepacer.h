@@ -27,7 +27,7 @@ namespace dxvk {
 
     uint32_t getEffectiveFrameLatency(uint32_t configuredLatency) const;
 
-    bool needsGpuSignal() const { return m_mode == DxvkFramePace::LowLatency; }
+    bool needsGpuSignal() const { return m_mode.load() == DxvkFramePace::LowLatency; }
 
     const Rc<sync::CallbackFence>& signal() const { return m_signal; }
 
@@ -39,7 +39,7 @@ namespace dxvk {
 
     void recordFrameDuration(std::chrono::high_resolution_clock::time_point frameStart);
 
-    DxvkFramePace m_mode               = DxvkFramePace::MaxFrameLatency;
+    std::atomic<DxvkFramePace> m_mode  = DxvkFramePace::MaxFrameLatency;
     int32_t       m_lowLatencyOffsetUs = 0;
 
     std::mutex                                                                         m_frameStartMutex;
