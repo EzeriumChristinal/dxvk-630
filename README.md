@@ -27,7 +27,7 @@ Built on DXVK v3.0.2 with cherry-picks from the [Sarek](https://github.com/HansK
 | **Per-type pipeline locks** | Single `m_pipelineMutex` split into compute + graphics + pipeline mutexes |
 | **D3D9 frame pacer wiring** | FramePacer wired into D3D9 swapchain |
 | **Pipecompiler bugfixes** | Removed spurious `static` on `computeFallbackKey()` using `this` |
-| **Audit fixes (round 1-2)** | 48 bugfixes applied: UAF in pipecompiler/framepacer, data races, queue starvation, thundering herd, OOB reads, chunk pool leak, callback reentrancy, lazy frontbuffer blit, monitor deadlock, and 36+ more |
+| **Audit fixes (round 1-3)** | 55 bugfixes applied: UAF in pipecompiler/framepacer, data races, queue starvation, thundering herd, OOB reads, chunk pool leak, callback reentrancy, lazy frontbuffer blit, monitor deadlock, round 3 fixes (H-16, M-11, M-12, M-26, M-27, M-29, M-35), and 36+ more |
 
 ## Changes from Sarek
 
@@ -53,7 +53,12 @@ meson setup --cross-file build-win64.txt --buildtype release build-release
 ninja -C build-release
 ```
 
-Requires llvm-mingw, glslang, and meson. See [Build instructions](https://github.com/doitsujin/dxvk#build-instructions) from upstream DXVK for details.
+Requires llvm-mingw (ucrt), glslangValidator, meson 1.11+, and ninja. See [Build instructions](https://github.com/doitsujin/dxvk#build-instructions) from upstream DXVK for details.
+
+**Windows toolchain setup:**
+- llvm-mingw-20260616-ucrt-x86_64 (or newer), glslang, meson, ninja
+- Add to PATH or use absolute paths in cross-file
+- Run meson with `--cross-file build-win64.txt` (supplied)
 
 ## Configuration
 

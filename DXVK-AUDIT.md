@@ -5,7 +5,7 @@ Workspace: 4 dirs
 | Repo | Origin | State |
 |------|--------|-------|
 | `dxvk/` | doitsujin/dxvk v3.0.2 | Pristine upstream, 5 recent commits |
-| `dxvk-630/` | Fork of v3.0.2 + 10 commits | Active fork, tag v3.0.2-dxvk630-1 |
+| `dxvk-630/` | Fork of v3.0.2 + 12 commits | Active fork, tag v3.0.2-dxvk630-1 |
 | `DXVK-Sarek/` | pythonlover02/DXVK-Sarek v1.12.0 | Different codebase era (v1.10.x lineage) |
 | `tools/` | llvm-mingw, meson 1.11.2, ninja, glslang, Vulkan-Headers | Build toolchain |
 
@@ -13,7 +13,7 @@ Workspace: 4 dirs
 
 ## ARCHITECTURE
 
-dxvk-630 = DXVK v3.0.2 base + 10 commits + uncommitted audit fixes:
+dxvk-630 = DXVK v3.0.2 base + 12 commits:
 1. Squash+patch (v3.0.2 base + Gen9/async changes)
 2. README rewrite
 3. Threading/DXGI/D3D11 fixes batch
@@ -24,6 +24,8 @@ dxvk-630 = DXVK v3.0.2 base + 10 commits + uncommitted audit fixes:
 8. Gen9 profile user-config respect, missing device IDs, dyasync safety
 9. NT handle leak, Present1 dirty rects, worker serialization removal, LTO
 10. D3D9 frame pacer wiring, IsCurrent adapter tracking, pipeline mutex split
+11. Audit fixes round 2 (H-11..H-17, M-14, M-16, M-18, M-19, M-24)
+12. Audit fixes round 3 (H-16, M-11, M-12, M-26, M-27, M-29, M-35)
 
 Key diff from upstream: Vulkan 1.3->1.2, 17 features optional, Gen9 detection, dyasync pipecompiler, frame pacer, LTO, per-type pipeline locks.
 
