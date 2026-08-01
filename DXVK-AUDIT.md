@@ -490,6 +490,11 @@ Fork is at v3.0.2. Upstream DXVK has moved beyond (v3.1+). Consider periodic reb
 - **M-29** `ExecuteFlush` returns early if no pending chunks, signals hEvent directly
 - **M-35** `m_mode` made `std::atomic<DxvkFramePace>` - safe for future dynamic switching
 - **M-36** `m_nextFrame` write inside lock (folded into H-15)
+- **A-1** D3D9 framepacer LowLatency wired up: `ctx->signal` + `endFrame` before flush, pacer `firstFrameId=0` - pacing sleep no longer no-op
+- **A-2** dyasync teardown UAF: `DxvkPipelineManager` dtor stops+joins compiler before pipeline map destruction
+- **A-3** compiler oversubscription: pipemanager worker count halved when dyasync active (4-core Gen9: 4+2 -> 1+2 <= cores-1)
+- **A-4** dyasync workers set to `ThreadPriority::Lowest` (matches pipemanager, no render-thread preemption)
+- **A-5** dyasync dedupe keyed by (pipeline, state hash) - variant Y no longer dropped while variant X compiles
 - **L-1** dead `line.empty()` after `line[n] == '['` removed
 - **L-2** Release returns 0 not ~0u on null dispatch
 - **L-3** blend_frame_duration uses int64_t intermediate - no overflow on long frames
@@ -503,13 +508,12 @@ Fork is at v3.0.2. Upstream DXVK has moved beyond (v3.1+). Consider periodic reb
 Release build clean, 224/224 targets, 5 DLLs (d3d8, d3d9, d3d10core, d3d11, dxgi). Warnings: pre-existing only (dxbc-spirv unused field, d3d8 missing override, nontrivial memcpy warnings).
 
 ### NOT FIXED (deferred)
-- **H-7, H-8** dynamicRendering/sync2 optional without fallback - risk assessed, Gen9 driver known-good
 - **M-9** WaitForVBlank drifts - minor, requires Vulkan timing extension
 - **M-10** config overflow audit - int32 parser done; `maxAvailableMemory` uint32_t could wrap (manual misconfig only)
 - **M-12** monotonic clock full regression detection - minWait guard added, full fix deferred
 - **M-13** TOCTOU on m_lastFrameStart - wide critical section, low risk
 - **M-15** O(n) queue scan - rare, teardown only
-- **M-17** worker Lowest priority - design tradeoff
+- **M-17** worker Lowest priority - resolved in round 4: dyasync now Lowest too
 - **M-20** duration double-counts idle - measurement inaccuracy
 - **M-21** ApplyDirtyNullBindings overhead - perf not correctness
 - **M-22** FindMapEntry linear scan - O(n) but deferred context
@@ -541,8 +545,9 @@ Release build clean, 224/224 targets, 5 DLLs (d3d8, d3d9, d3d10core, d3d11, dxgi
 | 2026-07-28 | Code verification + merge into single document | opencode |
 | 2026-07-28 | Round 2: H-11..H-17, M-14,M-16,M-18,M-19,M-24 fixes + build verification | opencode |
 | 2026-07-29 | Round 3: H-16, M-11,M-12,M-26,M-27,M-29,M-35 fixes + build verification + audit doc update | opencode |
+| 2026-08-01 | Round 4: A-1..A-5 (D3D9 framepacer dead, dyasync teardown UAF, oversubscription, priority, dedupe) + audit doc update | opencode |
 
-Total issues found: 95 (8 critical+high, 36 medium+low fixes applied; after round 3: 55 fixes, 0 high remaining, 21 other deferred)
+Total issues found: 95 (8 critical+high, 36 medium+low fixes applied; after round 4: 60 fixes, 0 high remaining, 16 other deferred)
 
 ---
 

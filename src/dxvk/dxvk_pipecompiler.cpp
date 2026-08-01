@@ -128,11 +128,19 @@ namespace dxvk {
   }
 
 
+  void DxvkPipelineCompiler::stop() {
+    this->requestStop();
+    this->joinAll();
+  }
+
+
   void DxvkPipelineCompiler::spawnWorkers(uint32_t count) {
     m_workers.reserve(count);
 
-    for (uint32_t i = 0; i < count; i++)
-      m_workers.emplace_back([this] { this->runCompilerThread(); });
+    for (uint32_t i = 0; i < count; i++) {
+      auto& worker = m_workers.emplace_back([this] { this->runCompilerThread(); });
+      worker.set_priority(ThreadPriority::Lowest);
+    }
   }
 
 
@@ -163,10 +171,12 @@ namespace dxvk {
     std::lock_guard<std::mutex> lock(m_mutex);
 
     if (entry.pipeline) {
-      if (!m_queuedGraphicsPipelines.insert(entry.pipeline).second)
+      if (!m_queuedGraphicsPipelines.insert(
+            GraphicsQueueKey { entry.pipeline, entry.state.hash() }).second)
         return false;
     } else if (entry.computePipeline) {
-      if (!m_queuedComputePipelines.insert(entry.computePipeline).second)
+      if (!m_queuedComputePipelines.insert(
+            ComputeQueueKey { entry.computePipeline, entry.computeState.hash() }).second)
         return false;
     }
 
@@ -178,7 +188,13 @@ namespace dxvk {
 
   void DxvkPipelineCompiler::removePipeline(DxvkGraphicsPipeline* pipeline) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_queuedGraphicsPipelines.erase(pipeline);
+
+    for (auto i = m_queuedGraphicsPipelines.begin(); i != m_queuedGraphicsPipelines.end(); ) {
+      if (i->pipeline == pipeline)
+        i = m_queuedGraphicsPipelines.erase(i);
+      else
+        i++;
+    }
 
     auto pred = [pipeline](const DxvkPipelineEntry& e) { return e.pipeline == pipeline; };
     m_liveQueue.erase(std::remove_if(m_liveQueue.begin(), m_liveQueue.end(), pred),
@@ -190,7 +206,13 @@ namespace dxvk {
 
   void DxvkPipelineCompiler::removePipeline(DxvkComputePipeline* pipeline) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_queuedComputePipelines.erase(pipeline);
+
+    for (auto i = m_queuedComputePipelines.begin(); i != m_queuedComputePipelines.end(); ) {
+      if (i->pipeline == pipeline)
+        i = m_queuedComputePipelines.erase(i);
+      else
+        i++;
+    }
 
     auto pred = [pipeline](const DxvkPipelineEntry& e) { return e.computePipeline == pipeline; };
     m_liveQueue.erase(std::remove_if(m_liveQueue.begin(), m_liveQueue.end(), pred),
@@ -250,9 +272,11 @@ namespace dxvk {
     {
       std::lock_guard<std::mutex> lock(m_mutex);
       if (entry.pipeline)
-        m_queuedGraphicsPipelines.erase(entry.pipeline);
+        m_queuedGraphicsPipelines.erase(
+          GraphicsQueueKey { entry.pipeline, entry.state.hash() });
       else if (entry.computePipeline)
-        m_queuedComputePipelines.erase(entry.computePipeline);
+        m_queuedComputePipelines.erase(
+          ComputeQueueKey { entry.computePipeline, entry.computeState.hash() });
     }
   }
 

@@ -27,7 +27,7 @@ namespace dxvk {
     m_presentParams = *pPresentParams;
     m_window = m_presentParams.hDeviceWindow;
 
-    m_framePacer = std::make_unique<FramePacer>(m_device->config(), D3D9DeviceEx::MaxFrameLatency);
+    m_framePacer = std::make_unique<FramePacer>(m_device->config(), 0);
 
     UpdateWindowCtx();
 
@@ -900,12 +900,15 @@ namespace dxvk {
 
         // Submit command list and present
         ctx->synchronizeWsi(cSync);
+
+        if (cPacer && cPacer->needsGpuSignal()) {
+          ctx->signal(cPacer->signal(), cFrameId);
+          cPacer->endFrame(cFrameId);
+        }
+
         ctx->flushCommandList(nullptr, nullptr);
 
         cDevice->presentImage(cPresenter, cLatency, cFrameId, nullptr);
-
-        if (cPacer)
-          cPacer->endFrame(cFrameId);
       });
 
       m_parent->FlushCsChunk();

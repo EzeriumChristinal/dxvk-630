@@ -32,6 +32,36 @@ namespace dxvk {
 
   public:
 
+    struct GraphicsQueueKey {
+      DxvkGraphicsPipeline* pipeline = nullptr;
+      size_t                stateHash = 0;
+
+      bool operator==(const GraphicsQueueKey& other) const {
+        return pipeline == other.pipeline && stateHash == other.stateHash;
+      }
+    };
+
+    struct GraphicsQueueKeyHash {
+      size_t operator()(const GraphicsQueueKey& key) const {
+        return size_t(uintptr_t(key.pipeline)) ^ key.stateHash;
+      }
+    };
+
+    struct ComputeQueueKey {
+      DxvkComputePipeline* pipeline = nullptr;
+      size_t               stateHash = 0;
+
+      bool operator==(const ComputeQueueKey& other) const {
+        return pipeline == other.pipeline && stateHash == other.stateHash;
+      }
+    };
+
+    struct ComputeQueueKeyHash {
+      size_t operator()(const ComputeQueueKey& key) const {
+        return size_t(uintptr_t(key.pipeline)) ^ key.stateHash;
+      }
+    };
+
     explicit DxvkPipelineCompiler(const DxvkDevice* device);
 
     ~DxvkPipelineCompiler();
@@ -46,6 +76,8 @@ namespace dxvk {
     const DxvkComputePipelineStateInfo&  state,
           DxvkPipelinePriority           priority);
 
+  void stop();
+
   void removePipeline(DxvkGraphicsPipeline* pipeline);
 
   void removePipeline(DxvkComputePipeline* pipeline);
@@ -59,8 +91,8 @@ namespace dxvk {
     std::deque<DxvkPipelineEntry> m_liveQueue;
     std::deque<DxvkPipelineEntry> m_backgroundQueue;
 
-    std::unordered_set<DxvkGraphicsPipeline*> m_queuedGraphicsPipelines;
-    std::unordered_set<DxvkComputePipeline*>  m_queuedComputePipelines;
+    std::unordered_set<GraphicsQueueKey, GraphicsQueueKeyHash> m_queuedGraphicsPipelines;
+    std::unordered_set<ComputeQueueKey,  ComputeQueueKeyHash>  m_queuedComputePipelines;
 
     std::vector<dxvk::thread>     m_workers;
 

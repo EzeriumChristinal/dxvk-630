@@ -100,6 +100,11 @@ namespace dxvk {
     if (env::is32BitHostPlatform())
       workerCount = std::min(workerCount, 8u);
 
+    // When dyasync is active it spawns its own compile threads, so shrink
+    // the worker pool to avoid oversubscribing low-core-count systems.
+    if (m_device->config().enableDyasync == Tristate::True)
+      workerCount = std::max(1u, (workerCount - 1u) / 2u);
+
     // Number of workers that can process pipeline pipelines with normal
     // priority. Any other workers can only build high-priority pipelines.
     // Base this on the available core count, not the worker count, since
@@ -203,6 +208,14 @@ namespace dxvk {
   
   
   DxvkPipelineManager::~DxvkPipelineManager() {
+    // Stop async compile threads before any pipeline objects are
+    // destroyed, otherwise in-flight dyasync compiles may dereference
+    // pipelines that the pipeline map destructors just released.
+    if (m_compiler)
+      m_compiler->stop();
+
+    m_workers.stopWorkers();
+
     auto vk = m_device->vkd();
 
     if (!m_device->canUseDescriptorHeap())
