@@ -6,7 +6,36 @@
 #include "dxvk_shader_ir.h"
 
 namespace dxvk {
-  
+
+  namespace {
+
+    DxvkOptions resolveOptions(const DxvkInstance* instance, const DxvkAdapter* adapter) {
+      DxvkOptions options = instance->options();
+
+      // Resolve Gen9 profile before the pipeline manager is constructed.
+      // The pipeline manager decides whether to spawn the dyasync compiler
+      // (and how many worker threads to use) from this option set, and it
+      // is constructed from the device init list before the ctor body runs.
+      if (adapter->isGen9LowPower()) {
+        options.enableGen9Profile = true;
+        if (options.enableDyasync == Tristate::Auto)
+          options.enableDyasync = Tristate::True;
+        if (options.useRawSsbo == Tristate::Auto)
+          options.useRawSsbo = Tristate::False;
+        if (options.numDyasyncThreads == 0)
+          options.numDyasyncThreads = std::min<int32_t>(4u,
+            std::thread::hardware_concurrency());
+        if (options.maxMemoryBudget == 0u) {
+          VkDeviceSize heapSize = adapter->memoryProperties().memoryHeaps[0].size;
+          options.maxMemoryBudget = heapSize / 2u;
+        }
+      }
+
+      return options;
+    }
+
+  }
+
   DxvkDevice::DxvkDevice(
     const Rc<DxvkInstance>&         instance,
     const Rc<DxvkAdapter>&          adapter,
@@ -14,7 +43,7 @@ namespace dxvk {
     const DxvkDeviceCapabilities&   caps,
     const DxvkDeviceQueueSet&       queues,
     const DxvkQueueCallback&        queueCallback)
-  : m_options           (instance->options()),
+  : m_options           (resolveOptions(instance.ptr(), adapter.ptr())),
     m_instance          (instance),
     m_adapter           (adapter),
     m_vkd               (vkd),
@@ -38,21 +67,8 @@ namespace dxvk {
 
     determineShaderOptions();
 
-    if (m_adapter->isGen9LowPower()) {
-      m_options.enableGen9Profile = true;
-      if (m_options.enableDyasync == Tristate::Auto)
-        m_options.enableDyasync = Tristate::True;
-      if (m_options.useRawSsbo == Tristate::Auto)
-        m_options.useRawSsbo = Tristate::False;
-      if (m_options.numDyasyncThreads == 0)
-        m_options.numDyasyncThreads = std::min<int32_t>(4u,
-          std::thread::hardware_concurrency());
-      if (m_options.maxMemoryBudget == 0u) {
-        VkDeviceSize heapSize = m_adapter->memoryProperties().memoryHeaps[0].size;
-        m_options.maxMemoryBudget = heapSize / 2u;
-      }
+    if (m_adapter->isGen9LowPower())
       Logger::info("DXVK: Intel Gen9 low-power profile active");
-    }
 
     if (env::getEnvVar("DXVK_SHADER_CACHE") != "0" && DxvkShader::getShaderDumpPath().empty())
       m_shaderCache = DxvkShaderCache::getInstance();
