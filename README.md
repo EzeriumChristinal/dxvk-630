@@ -27,7 +27,7 @@ Built on DXVK v3.0.2 with cherry-picks from the [Sarek](https://github.com/HansK
 | **Per-type pipeline locks** | Single `m_pipelineMutex` split into compute + graphics + pipeline mutexes |
 | **D3D9 frame pacer wiring** | FramePacer wired into D3D9 swapchain |
 | **Pipecompiler bugfixes** | Removed spurious `static` on `computeFallbackKey()` using `this` |
-| **Audit fixes (round 1-3)** | 55 bugfixes applied: UAF in pipecompiler/framepacer, data races, queue starvation, thundering herd, OOB reads, chunk pool leak, callback reentrancy, lazy frontbuffer blit, monitor deadlock, round 3 fixes (H-16, M-11, M-12, M-26, M-27, M-29, M-35), and 36+ more |
+| **Audit fixes (rounds 1-5)** | 61 bugfixes applied, 0 high-priority bugs remaining: UAF in pipecompiler/framepacer, data races, queue starvation, thundering herd, OOB reads, chunk pool leak, callback reentrancy, lazy frontbuffer blit, monitor deadlock, pipeline mutex split, dedupe, Gen9 options resolution. 15 issues deferred (all low-risk or require Vulkan timing extensions). |
 
 ## Changes from Sarek
 
