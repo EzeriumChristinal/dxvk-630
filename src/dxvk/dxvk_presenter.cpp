@@ -1255,6 +1255,12 @@ namespace dxvk {
     m_swapchain = VK_NULL_HANDLE;
     m_acquireStatus = VK_NOT_READY;
 
+    // The fences above have been destroyed, so any reference to a present
+    // fence from a previous swapchain is now dangling. Reset it so that the
+    // queue thread does not wait on a stale handle after a swapchain recreate.
+    m_lastPresentFence = VK_NULL_HANDLE;
+    m_lastPresentFenceFrameId = 0;
+
     m_presentPending = false;
 
     m_hdrMetadataDirty = true;

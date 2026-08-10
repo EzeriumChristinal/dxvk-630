@@ -1113,7 +1113,7 @@ namespace dxvk {
             DxvkPipelinePriority::High);
           return DxvkGraphicsPipelineHandle { fallback,
             DxvkGraphicsPipelineType::BasePipeline,
-            DxvkAttachmentMask() };
+            computeAttachmentMask(state) };
         }
       }
 
