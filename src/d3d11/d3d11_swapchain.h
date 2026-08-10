@@ -118,7 +118,7 @@ namespace dxvk {
     uint32_t                  m_frameLatencyCap = 0;
     HANDLE                    m_frameLatencyEvent = nullptr;
     Rc<sync::CallbackFence>   m_frameLatencySignal;
-    std::unique_ptr<FramePacer> m_framePacer;
+    std::shared_ptr<FramePacer> m_framePacer;
 
     VkColorSpaceKHR           m_colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 

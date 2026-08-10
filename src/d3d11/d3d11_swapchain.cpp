@@ -72,7 +72,7 @@ namespace dxvk {
     CreateBackBuffers();
     CreateBlitter();
 
-    m_framePacer = std::make_unique<FramePacer>(m_device->config(), m_frameId);
+    m_framePacer = std::make_shared<FramePacer>(m_device->config(), m_frameId);
   }
 
 
@@ -435,7 +435,7 @@ namespace dxvk {
       cSwapImage      = GetBackBufferView(),
       cSync           = sync,
       cPresenter      = m_presenter,
-      cPacer          = m_framePacer.get(),
+      cPacer          = m_framePacer,
       cLatency        = m_latency,
       cColorSpace     = m_colorSpace,
       cFrameId        = m_frameId

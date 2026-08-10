@@ -342,6 +342,9 @@ namespace dxvk {
 
 
   void D3D9ConstantBufferCopy::writeIntRange(const D3D9ConstantBufferCopyArgs& args, const D3D9ConstantRange& range) const {
+    if (range.dstIndex >= args.intBufferSize / sizeof(Vector4i))
+      return;
+
     uint32_t count = std::min<uint32_t>(range.count,
       uint32_t((args.intBufferSize - range.dstIndex * sizeof(Vector4i)) / sizeof(Vector4i)));
 
@@ -372,6 +375,9 @@ namespace dxvk {
 
 
   void D3D9ConstantBufferCopy::writeBoolRange(const D3D9ConstantBufferCopyArgs& args, const D3D9ConstantRange& range) const {
+    if (range.dstIndex >= args.boolBufferSize / sizeof(uint32_t))
+      return;
+
     uint32_t count = std::min<uint32_t>(range.count,
       uint32_t((args.boolBufferSize - range.dstIndex * sizeof(uint32_t)) / sizeof(uint32_t)));
 

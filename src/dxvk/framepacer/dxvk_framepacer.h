@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <optional>
 
@@ -16,6 +17,12 @@ namespace dxvk {
     MaxFrameLatency = 0,
     LowLatency      = 1,
     MinLatency      = 2,
+  };
+
+  // Timing state is shared with the GPU-completion callback so that a
+  // late callback cannot touch memory of an already-destroyed FramePacer.
+  struct FramePacerTimings {
+    std::atomic<int32_t> avgFrameDurationUs = { 0 };
   };
 
   class FramePacer {
@@ -37,14 +44,12 @@ namespace dxvk {
 
   private:
 
-    void recordFrameDuration(std::chrono::high_resolution_clock::time_point frameStart);
-
     std::atomic<DxvkFramePace> m_mode  = DxvkFramePace::MaxFrameLatency;
     int32_t       m_lowLatencyOffsetUs = 0;
 
     std::mutex                                                                         m_frameStartMutex;
     std::optional<std::chrono::high_resolution_clock::time_point>                      m_lastFrameStart     = std::nullopt;
-    std::atomic<int32_t>                                                               m_avgFrameDurationUs = { 0 };
+    std::shared_ptr<FramePacerTimings>                                                 m_timings            = std::make_shared<FramePacerTimings>();
 
     Rc<sync::CallbackFence> m_signal;
 

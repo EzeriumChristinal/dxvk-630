@@ -1097,12 +1097,11 @@ namespace dxvk {
     if (synchronizeSubmission)
       m_submitStatus.result = VK_NOT_READY;
 
-    // Exit early if there's nothing to do
-    if (!GetPendingCsChunks()) {
-      if (hEvent)
-        SetEvent(hEvent);
+    // Exit early if there's nothing to do. If an event is supplied it must
+    // be signalled when the pending GPU work completes, so we cannot return
+    // early in that case - otherwise the event fires before the work is done.
+    if (!GetPendingCsChunks() && !hEvent)
       return;
-    }
 
     m_hasPendingUnresolvedPass = false;
 

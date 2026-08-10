@@ -188,7 +188,7 @@ namespace dxvk {
 
     std::optional<VkHdrMetadataEXT> m_hdrMetadata;
 
-    std::unique_ptr<FramePacer> m_framePacer;
+    std::shared_ptr<FramePacer> m_framePacer;
 
     D3D9VkExtSwapchain m_swapchainExt;
 

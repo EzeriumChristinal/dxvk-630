@@ -27,7 +27,7 @@ namespace dxvk {
     m_presentParams = *pPresentParams;
     m_window = m_presentParams.hDeviceWindow;
 
-    m_framePacer = std::make_unique<FramePacer>(m_device->config(), 0);
+    m_framePacer = std::make_shared<FramePacer>(m_device->config(), 0);
 
     UpdateWindowCtx();
 
@@ -882,7 +882,7 @@ namespace dxvk {
         cSync           = sync,
         cFrameId        = m_wctx->frameId,
         cLatency        = m_latencyTracker,
-        cPacer          = m_framePacer.get()
+        cPacer          = m_framePacer
       ] (DxvkContext* ctx) {
         // Update back buffer color space as necessary
         if (cSrcView->image()->info().colorSpace != cColorSpace) {

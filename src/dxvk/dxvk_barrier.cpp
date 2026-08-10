@@ -498,13 +498,18 @@ namespace dxvk {
         && v[j].oldLayout == v[i].oldLayout
         && v[j].newLayout == v[i].newLayout
         && v[j].subresourceRange.aspectMask == v[i].subresourceRange.aspectMask
+        && v[j].subresourceRange.baseArrayLayer == v[i].subresourceRange.baseArrayLayer
+        && v[j].subresourceRange.layerCount == v[i].subresourceRange.layerCount
+        && v[j].srcQueueFamilyIndex == v[i].srcQueueFamilyIndex
+        && v[j].dstQueueFamilyIndex == v[i].dstQueueFamilyIndex
         && v[j].subresourceRange.baseMipLevel == v[i].subresourceRange.baseMipLevel + v[i].subresourceRange.levelCount)
         j++;
 
       if (j > i + 1) {
         VkImageMemoryBarrier2 merged = v[i];
-        uint32_t rangeEnd = v[j - 1].subresourceRange.baseMipLevel + v[j - 1].subresourceRange.levelCount;
-        merged.subresourceRange.levelCount = rangeEnd - v[i].subresourceRange.baseMipLevel;
+        uint64_t rangeEnd = uint64_t(v[j - 1].subresourceRange.baseMipLevel)
+                          + uint64_t(v[j - 1].subresourceRange.levelCount);
+        merged.subresourceRange.levelCount = uint32_t(rangeEnd - v[i].subresourceRange.baseMipLevel);
         v[writeIdx++] = merged;
       } else {
         v[writeIdx++] = v[i];
