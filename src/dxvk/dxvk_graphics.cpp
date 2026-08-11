@@ -1104,10 +1104,14 @@ namespace dxvk {
     instance = this->findInstance(state);
 
     if (!instance) {
-      // dyasync fast path: return placeholder if available
-      if (m_compiler) {
+      // dyasync fast path: return placeholder if available. Only states
+      // that can be linked from base libraries without shader patching
+      // are eligible, and the instance is cached immediately so that
+      // subsequent draws find it instead of re-entering this slow path.
+      if (m_compiler && this->canCreateBasePipeline(state)) {
         VkPipeline fallback = this->getBasePipeline(state);
         if (fallback != VK_NULL_HANDLE) {
+          instance = this->createInstance(state, true);
           lock.unlock();
           m_compiler->queueCompilation(this, state,
             DxvkPipelinePriority::High);

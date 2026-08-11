@@ -19,12 +19,6 @@ namespace dxvk {
     MinLatency      = 2,
   };
 
-  // Timing state is shared with the GPU-completion callback so that a
-  // late callback cannot touch memory of an already-destroyed FramePacer.
-  struct FramePacerTimings {
-    std::atomic<int32_t> avgFrameDurationUs = { 0 };
-  };
-
   class FramePacer {
 
   public:
@@ -49,7 +43,7 @@ namespace dxvk {
 
     std::mutex                                                                         m_frameStartMutex;
     std::optional<std::chrono::high_resolution_clock::time_point>                      m_lastFrameStart     = std::nullopt;
-    std::shared_ptr<FramePacerTimings>                                                 m_timings            = std::make_shared<FramePacerTimings>();
+    std::shared_ptr<std::atomic<int32_t>> m_avgFrameDurationUs = std::make_shared<std::atomic<int32_t>>(0);
 
     Rc<sync::CallbackFence> m_signal;
 

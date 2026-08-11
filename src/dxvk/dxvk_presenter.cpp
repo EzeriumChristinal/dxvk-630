@@ -225,6 +225,9 @@ namespace dxvk {
         currSync.fenceSignaled = status >= 0;
 
       if (currSync.fenceSignaled) {
+        // Serialize with signalFrame, which may still wait on this fence,
+        // and with destroySwapchain, which destroys the fences.
+        std::lock_guard lock(m_frameMutex);
         m_lastPresentFence = currSync.fence;
         m_lastPresentFenceFrameId = frameId;
       }
@@ -295,12 +298,19 @@ namespace dxvk {
       if (canSignal)
         m_signal->signal(frameId);
     } else {
+      // Hold the frame mutex while waiting so that destroySwapchain,
+      // which destroys the present fences under the same mutex, cannot
+      // free the fence out from under vkWaitForFences.
+      std::unique_lock lock(m_frameMutex);
+
       if (m_hasSwapchainMaintenance1 && m_lastPresentFence && m_lastPresentFenceFrameId == frameId) {
         VkResult vr = m_vkd->vkWaitForFences(m_vkd->device(),
           1, &m_lastPresentFence, VK_TRUE, ~0ull);
         if (vr)
           Logger::err(str::format("Presenter: Failed to wait for present fence: ", vr));
       }
+
+      lock.unlock();
 
       m_fpsLimiter.delay();
       m_signal->signal(frameId);

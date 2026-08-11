@@ -63,16 +63,16 @@ namespace dxvk {
 
 
     void record_frame_duration(
-            std::shared_ptr<FramePacerTimings>              timings,
+            std::shared_ptr<std::atomic<int32_t>>            timings,
             std::chrono::high_resolution_clock::time_point  frameStart) {
       auto elapsedUs = int32_t(std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::high_resolution_clock::now() - frameStart).count());
 
-      int32_t expected = timings->avgFrameDurationUs.load();
+      int32_t expected = timings->load();
       int32_t desired;
       do {
         desired = blend_frame_duration(expected, elapsedUs);
-      } while (!timings->avgFrameDurationUs.compare_exchange_weak(expected, desired));
+      } while (!timings->compare_exchange_weak(expected, desired));
     }
 
 
@@ -140,7 +140,7 @@ namespace dxvk {
     {
       std::lock_guard<std::mutex> lock(m_frameStartMutex);
       wakeTime = predict_wake_time(m_mode.load(), m_lastFrameStart,
-        m_timings->avgFrameDurationUs.load(), m_lowLatencyOffsetUs);
+        m_avgFrameDurationUs->load(), m_lowLatencyOffsetUs);
     }
 
     if (wakeTime.has_value()) {
@@ -181,7 +181,7 @@ namespace dxvk {
     // can outlive this object: the fence is signalled from the queue
     // thread after GPU work completes, which may be after the swapchain
     // that owns this pacer has been destroyed.
-    m_signal->setCallback(frameId, [timings = m_timings, fs = *frameStart] () {
+    m_signal->setCallback(frameId, [timings = m_avgFrameDurationUs, fs = *frameStart] () {
       record_frame_duration(timings, fs);
     });
   }

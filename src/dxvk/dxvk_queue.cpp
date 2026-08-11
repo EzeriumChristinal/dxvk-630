@@ -197,11 +197,15 @@ namespace dxvk {
       if (entry.result == VK_ERROR_DEVICE_LOST && m_checkpoints)
         m_checkpoints->printHangInfo();
 
-      // On success, pass it on to the queue thread
-      { std::unique_lock<dxvk::mutex> lock(m_mutex);
+      // On success, pass it on to the queue thread. Do not call
+      // waitForIdle while holding the lock or before the entry has
+      // been popped, otherwise the queue can never drain.
+      bool doForward = (entry.result == VK_SUCCESS) ||
+        (entry.present.presenter != nullptr && entry.result != VK_ERROR_DEVICE_LOST);
 
-        bool doForward = (entry.result == VK_SUCCESS) ||
-          (entry.present.presenter != nullptr && entry.result != VK_ERROR_DEVICE_LOST);
+      bool syncOnError = false;
+
+      { std::unique_lock<dxvk::mutex> lock(m_mutex);
 
         if (doForward) {
           m_finishQueue.push(std::move(entry));
@@ -210,12 +214,15 @@ namespace dxvk {
           m_lastError = entry.result;
 
           if (m_lastError != VK_ERROR_DEVICE_LOST)
-            m_device->waitForIdle();
+            syncOnError = true;
         }
 
         m_submitQueue.pop();
         m_submitCond.notify_all();
       }
+
+      if (syncOnError)
+        m_device->waitForIdle();
 
       // Good time to invoke allocator tasks now since we
       // expect this to get called somewhat periodically.

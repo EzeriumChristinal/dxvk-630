@@ -124,8 +124,14 @@ namespace dxvk {
 
     double                    m_targetFrameRate = 0.0;
 
-    dxvk::mutex               m_frameStatisticsLock;
-    DXGI_VK_FRAME_STATISTICS  m_frameStatistics = { };
+    // Frame statistics are shared with the present-completion callback so
+    // that a late callback cannot touch memory of a destroyed swapchain.
+    struct FrameStatistics {
+      dxvk::mutex            lock;
+      DXGI_VK_FRAME_STATISTICS stats = { };
+    };
+
+    std::shared_ptr<FrameStatistics> m_frameStatistics = std::make_shared<FrameStatistics>();
 
     Rc<hud::HudLatencyItem>   m_latencyHud;
 

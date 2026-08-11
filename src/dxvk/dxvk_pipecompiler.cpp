@@ -14,7 +14,6 @@ namespace dxvk {
     constexpr uint32_t DYASYNC_MIN_WORKERS         = 1;
     constexpr uint32_t DYASYNC_MAX_WORKERS         = 32;
     constexpr uint32_t DYASYNC_MAX_WORKERS_32BIT   = 16;
-    constexpr uint32_t DYASYNC_QUEUE_CAPACITY      = 4096;
     constexpr uint32_t DYASYNC_BACKGROUND_INTERVAL = 8;
 
     enum class TakeLane : uint32_t {
