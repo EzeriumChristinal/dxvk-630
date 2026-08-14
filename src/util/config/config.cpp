@@ -1608,6 +1608,7 @@ namespace dxvk {
 
     // Parse absolute number with overflow check
     int64_t intval = 0;
+    int64_t limit = sign < 0 ? 2147483648ll : 2147483647ll;
 
     for (size_t i = start; i < value.size(); i++) {
       if (value[i] < '0' || value[i] > '9')
@@ -1615,7 +1616,7 @@ namespace dxvk {
 
       int64_t next = intval * 10 + int64_t(value[i] - '0');
 
-      if (next > 2147483648u)
+      if (next > limit)
         return false;
 
       intval = next;

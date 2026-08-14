@@ -1139,12 +1139,6 @@ namespace dxvk {
   }
 
 
-  DxvkGraphicsPipelineInstance* DxvkGraphicsPipeline::findInstanceLockFree(
-    const DxvkGraphicsPipelineStateInfo& state) {
-    return m_pipelines.find(state);
-  }
-
-
   void DxvkGraphicsPipeline::compilePipeline(
     const DxvkGraphicsPipelineStateInfo& state) {
     if (m_device->config().enableGraphicsPipelineLibrary == Tristate::True)

@@ -657,9 +657,6 @@ namespace dxvk {
     DxvkGraphicsPipelineInstance* findInstance(
       const DxvkGraphicsPipelineStateInfo& state);
 
-    DxvkGraphicsPipelineInstance* findInstanceLockFree(
-      const DxvkGraphicsPipelineStateInfo& state);
-
     bool canCreateBasePipeline(
       const DxvkGraphicsPipelineStateInfo& state) const;
 

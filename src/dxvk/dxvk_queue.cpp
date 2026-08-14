@@ -255,7 +255,9 @@ namespace dxvk {
       
       DxvkSubmitEntry entry = std::move(m_finishQueue.front());
       lock.unlock();
-      
+
+      bool waitForIdle = false;
+
       if (entry.submit.cmdList != nullptr) {
         VkResult status = m_lastError.load();
 
@@ -271,10 +273,10 @@ namespace dxvk {
           waitInfo.pSemaphores = semaphores.data();
           waitInfo.pValues = timelines.data();
 
-          status = vk->vkWaitSemaphores(vk->device(), &waitInfo, ~0ull);
+        status = vk->vkWaitSemaphores(vk->device(), &waitInfo, ~0ull);
 
-          if (entry.latency.tracker && status == VK_SUCCESS)
-            entry.latency.tracker->notifyGpuExecutionEnd(entry.latency.frameId);
+        if (entry.latency.tracker && status == VK_SUCCESS)
+          entry.latency.tracker->notifyGpuExecutionEnd(entry.latency.frameId);
         }
 
         if (status == VK_ERROR_DEVICE_LOST && m_checkpoints)
@@ -282,9 +284,7 @@ namespace dxvk {
 
         if (status != VK_SUCCESS) {
           m_lastError = status;
-
-          if (status != VK_ERROR_DEVICE_LOST)
-            m_device->waitForIdle();
+          waitForIdle = status != VK_ERROR_DEVICE_LOST;
         }
       } else if (entry.present.presenter != nullptr) {
         // Signal the frame and then immediately destroy the reference.
@@ -304,6 +304,11 @@ namespace dxvk {
       m_finishQueue.pop();
       m_finishCond.notify_all();
       lock.unlock();
+
+      // Do not wait for the queue to drain while the current entry is
+      // still in the queue, otherwise this can never complete.
+      if (waitForIdle)
+        m_device->waitForIdle();
 
       // Free the command list and associated objects now
       if (entry.submit.cmdList != nullptr) {

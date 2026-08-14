@@ -986,6 +986,10 @@ namespace dxvk {
     if (m_pipelineCache == VK_NULL_HANDLE)
       return;
 
+    // Compiler threads may still be creating pipelines at this point,
+    // so serialize against them before reading/destroying the cache.
+    lockPipelineCache();
+
     // Save cache to disk
     auto paths = DxvkShaderCache::getDefaultFilePaths();
     if (!paths.directory.empty()) {
@@ -1008,6 +1012,8 @@ namespace dxvk {
 
     m_vkd->vkDestroyPipelineCache(m_vkd->device(), m_pipelineCache, nullptr);
     m_pipelineCache = VK_NULL_HANDLE;
+
+    unlockPipelineCache();
   }
 
 }
