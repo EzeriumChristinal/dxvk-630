@@ -922,12 +922,7 @@ namespace dxvk {
     // otherwise we cannot accurately determine if the resource is
     // actually being used by the GPU right now.
     if (!Resource.isInUse(access)) {
-      // Fast path: once every chunk up to SequenceNumber has executed,
-      // synchronizing would be a no-op; skip the CS-thread roundtrip.
-      // Access refs are attached at execution time, so isInUse() above
-      // is fully accurate in this state.
-      if (m_csThread.lastSequenceNumber() < SequenceNumber)
-        SynchronizeCsThread(SequenceNumber);
+      SynchronizeCsThread(SequenceNumber);
 
       if (!Resource.isInUse(access))
         return true;
@@ -968,8 +963,9 @@ namespace dxvk {
 
 
   void D3D11ImmediateContext::EmitCsChunk(DxvkCsChunkRef&& chunk) {
-    if (m_parent->HasPendingInitCommands())
-      m_parent->FlushInitCommands();
+    // Flush init commands so that the CS thread
+    // can processe them before the first use.
+    m_parent->FlushInitCommands();
 
     m_csSeqNum = m_csThread.dispatchChunk(std::move(chunk));
   }

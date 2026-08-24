@@ -3,10 +3,10 @@
 #include <algorithm>
 #include <array>
 #include <string_view>
-#include <thread>
 
 #include "../../util/log/log.h"
 #include "../../util/util_env.h"
+#include "../../util/util_sleep.h"
 #include "../../util/util_string.h"
 
 #include "../dxvk_options.h"
@@ -81,11 +81,8 @@ namespace dxvk {
             std::optional<std::chrono::high_resolution_clock::time_point>  lastFrameStart,
             int32_t                                            avgFrameDurationUs,
             int32_t                                            offsetUs) {
-      switch (mode) {
-        case DxvkFramePace::MaxFrameLatency: return std::nullopt;
-        case DxvkFramePace::MinLatency:      return std::nullopt;
-        case DxvkFramePace::LowLatency:                                break;
-      }
+      if (mode != DxvkFramePace::LowLatency)
+        return std::nullopt;
 
       return lastFrameStart.has_value() && avgFrameDurationUs > 0
         ? std::optional(*lastFrameStart + std::chrono::microseconds(avgFrameDurationUs + offsetUs))
@@ -127,7 +124,7 @@ namespace dxvk {
   uint32_t FramePacer::getEffectiveFrameLatency(uint32_t configuredLatency) const {
     switch (m_mode.load()) {
       case DxvkFramePace::MaxFrameLatency: return configuredLatency;
-      case DxvkFramePace::LowLatency:      return std::min(configuredLatency, MIN_FRAME_LATENCY);
+      case DxvkFramePace::LowLatency:
       case DxvkFramePace::MinLatency:      return std::min(configuredLatency, MIN_FRAME_LATENCY);
     }
 
@@ -144,17 +141,11 @@ namespace dxvk {
     }
 
     if (wakeTime.has_value()) {
-      auto target = *wakeTime;
-      auto minWait = std::chrono::microseconds(100);
-      while (true) {
-        auto now = std::chrono::high_resolution_clock::now();
-        if (now >= target)
-          break;
-        auto remaining = std::chrono::duration_cast<std::chrono::microseconds>(target - now);
-        if (remaining < minWait)
-          break;
-        std::this_thread::sleep_until(target);
-      }
+      auto remaining = std::chrono::duration_cast<std::chrono::microseconds>(
+        *wakeTime - std::chrono::high_resolution_clock::now());
+
+      if (remaining >= std::chrono::microseconds(100))
+        Sleep::sleepFor(dxvk::high_resolution_clock::now(), remaining);
     }
 
     {

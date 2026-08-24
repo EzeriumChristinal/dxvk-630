@@ -110,7 +110,7 @@ namespace dxvk {
     // Base this on the available core count, not the worker count, since
     // that is what determines the impact of having multiple threads do
     // heavy CPU work.
-    uint32_t npWorkerCount = std::clamp(((coreCount - 1) * 5) / 7, 1u, workerCount);
+    uint32_t npWorkerCount = std::clamp(dyasyncBaseWorkers(coreCount), 1u, workerCount);
     uint32_t lpWorkerCount = std::clamp(((coreCount - 1) * 2) / 7, 1u, workerCount);
 
     m_workers.reserve(workerCount);

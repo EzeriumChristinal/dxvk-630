@@ -16,59 +16,24 @@ namespace dxvk {
     constexpr uint32_t DYASYNC_MAX_WORKERS_32BIT   = 16;
     constexpr uint32_t DYASYNC_BACKGROUND_INTERVAL = 8;
 
-    enum class TakeLane : uint32_t {
-      None       = 0,
-      Live       = 1,
-      Background = 2,
-    };
-
-    uint32_t base_worker_count(uint32_t cpu_cores) {
-      return ((std::max(1u, cpu_cores) - 1u) * 5u) / 7u;
-    }
-
-    uint32_t clamp_worker_count(uint32_t count) {
-      return std::clamp(count, DYASYNC_MIN_WORKERS, DYASYNC_MAX_WORKERS);
-    }
-
-    uint32_t apply_platform_cap(uint32_t count, bool is_32bit) {
-      return is_32bit ? std::min(count, DYASYNC_MAX_WORKERS_32BIT) : count;
-    }
-
     uint32_t resolve_worker_count(
             uint32_t cpu_cores,
             int32_t  config_thread_count,
             bool     is_32bit,
             bool     use_all_cores) {
-      return use_all_cores           ? cpu_cores
-           : config_thread_count > 0 ? uint32_t(config_thread_count)
-           :                           apply_platform_cap(
-                                          clamp_worker_count(base_worker_count(cpu_cores)),
-                                          is_32bit);
+      if (use_all_cores)
+        return cpu_cores;
+
+      if (config_thread_count > 0)
+        return uint32_t(config_thread_count);
+
+      uint32_t count = std::clamp(dyasyncBaseWorkers(cpu_cores),
+        DYASYNC_MIN_WORKERS, DYASYNC_MAX_WORKERS);
+      return is_32bit ? std::min(count, DYASYNC_MAX_WORKERS_32BIT) : count;
     }
 
     bool prefer_background(uint32_t pick) {
       return (pick % DYASYNC_BACKGROUND_INTERVAL) == 0;
-    }
-
-    bool entry_is_valid(const DxvkPipelineEntry& entry) {
-      return entry.pipeline != nullptr
-          || entry.computePipeline != nullptr;
-    }
-
-    bool work_available(
-            bool                           stop,
-      const std::deque<DxvkPipelineEntry>& liveQueue,
-      const std::deque<DxvkPipelineEntry>& backgroundQueue) {
-      return stop
-          || !liveQueue.empty()
-          || !backgroundQueue.empty();
-    }
-
-    TakeLane select_lane(bool live_empty, bool bg_empty, bool prefer_bg) {
-      return (prefer_bg && !bg_empty) ? TakeLane::Background
-           : (!live_empty)            ? TakeLane::Live
-           : (!bg_empty)              ? TakeLane::Background
-           :                            TakeLane::None;
     }
 
     DxvkPipelineEntry pop_front(std::deque<DxvkPipelineEntry>& queue) {
@@ -108,20 +73,6 @@ namespace dxvk {
       state,
       nullptr,
       DxvkComputePipelineStateInfo(),
-      priority,
-    });
-  }
-
-
-  bool DxvkPipelineCompiler::queueCompilation(
-          DxvkComputePipeline*           pipeline,
-    const DxvkComputePipelineStateInfo&  state,
-          DxvkPipelinePriority           priority) {
-    return this->pushEntry(DxvkPipelineEntry {
-      nullptr,
-      DxvkGraphicsPipelineStateInfo(),
-      pipeline,
-      state,
       priority,
     });
   }
@@ -177,11 +128,11 @@ namespace dxvk {
 
     if (entry.pipeline) {
       if (!m_queuedGraphicsPipelines.insert(
-            GraphicsQueueKey { entry.pipeline, entry.state.hash() }).second)
+            QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() }).second)
         return false;
     } else if (entry.computePipeline) {
       if (!m_queuedComputePipelines.insert(
-            ComputeQueueKey { entry.computePipeline, entry.computeState.hash() }).second)
+            QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() }).second)
         return false;
     }
 
@@ -193,10 +144,10 @@ namespace dxvk {
     } catch (...) {
       if (entry.pipeline)
         m_queuedGraphicsPipelines.erase(
-          GraphicsQueueKey { entry.pipeline, entry.state.hash() });
+          QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() });
       else if (entry.computePipeline)
         m_queuedComputePipelines.erase(
-          ComputeQueueKey { entry.computePipeline, entry.computeState.hash() });
+          QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() });
       throw;
     }
 
@@ -242,13 +193,15 @@ namespace dxvk {
 
 
   bool DxvkPipelineCompiler::takeEntry(DxvkPipelineEntry& entry, bool preferBackground) {
-    switch (select_lane(m_liveQueue.empty(), m_backgroundQueue.empty(), preferBackground)) {
-      case TakeLane::Live:       entry = pop_front(m_liveQueue);       return true;
-      case TakeLane::Background: entry = pop_front(m_backgroundQueue); return true;
-      case TakeLane::None:       return false;
+    if (!(preferBackground && !m_backgroundQueue.empty()) && !m_liveQueue.empty()) {
+      entry = pop_front(m_liveQueue);
+    } else if (!m_backgroundQueue.empty()) {
+      entry = pop_front(m_backgroundQueue);
+    } else {
+      return false;
     }
 
-    return false;
+    return true;
   }
 
 
@@ -264,7 +217,7 @@ namespace dxvk {
     std::unique_lock<std::mutex> lock(m_mutex);
 
     m_cond.wait(lock, [this] {
-      return work_available(m_stop, m_liveQueue, m_backgroundQueue);
+      return m_stop || !m_liveQueue.empty() || !m_backgroundQueue.empty();
     });
 
     if (m_stop)
@@ -292,18 +245,10 @@ namespace dxvk {
       std::lock_guard<std::mutex> lock(m_mutex);
       if (entry.pipeline)
         m_queuedGraphicsPipelines.erase(
-          GraphicsQueueKey { entry.pipeline, entry.state.hash() });
+          QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() });
       else if (entry.computePipeline)
         m_queuedComputePipelines.erase(
-          ComputeQueueKey { entry.computePipeline, entry.computeState.hash() });
-    }
-  }
-
-
-  void DxvkPipelineCompiler::processEntry(const DxvkPipelineEntry& entry) {
-    switch (entry_is_valid(entry)) {
-      case true:  this->compileAndCache(entry); break;
-      case false: break;
+          QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() });
     }
   }
 
@@ -311,8 +256,10 @@ namespace dxvk {
   void DxvkPipelineCompiler::runCompilerThread() {
     env::setThreadName("dxvk-dyasync");
 
-    for (DxvkPipelineEntry entry; this->waitForWork(entry); )
-      this->processEntry(entry);
+    for (DxvkPipelineEntry entry; this->waitForWork(entry); ) {
+      if (entry.pipeline || entry.computePipeline)
+        this->compileAndCache(entry);
+    }
   }
 
 }

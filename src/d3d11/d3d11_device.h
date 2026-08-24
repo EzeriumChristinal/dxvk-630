@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -424,10 +425,6 @@ namespace dxvk {
       m_initializer->FlushCsChunk();
     }
 
-    bool HasPendingInitCommands() const {
-      return m_initializer->HasPendingCs();
-    }
-
     void NotifyContextFlush() {
       m_initializer->NotifyContextFlush();
     }
@@ -524,9 +521,8 @@ namespace dxvk {
 
     Com<D3D11ImmediateContext, false> m_context;
 
-    dxvk::mutex                                m_removedEventMutex;
-    std::unordered_map<DWORD, HANDLE>          m_removedEvents;
-    DWORD                                      m_removedEventCounter = 0;
+    // Cookies are unique and never reused; nothing else to track.
+    std::atomic<DWORD>                         m_removedEventCounter = { 0u };
 
     HRESULT CreateShaderModule(
             D3D11CommonShader*      pShaderModule,

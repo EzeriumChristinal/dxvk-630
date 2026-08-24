@@ -89,9 +89,6 @@ namespace dxvk {
     /// Device name
     std::string deviceFilter;
 
-    /// Enable Gen9 low-power profile (auto-set by device detect)
-    bool enableGen9Profile = false;
-
     /// Enable async pipeline compilation (dyasync)
     Tristate enableDyasync = Tristate::Auto;
 

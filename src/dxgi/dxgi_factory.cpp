@@ -389,11 +389,9 @@ namespace dxvk {
     if (GpuPreference == DXGI_GPU_PREFERENCE_MINIMUM_POWER) {
       // Enumerate from the end to prefer integrated GPUs
       hr = this->EnumAdapters(adapterCount - Adapter - 1, &adapter);
-    } else if (GpuPreference == DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE) {
-      // Enumerate from the start to prefer discrete GPUs
-      hr = this->EnumAdapters(Adapter, &adapter);
     } else {
-      // Unspecified — default enumeration order
+      // HIGH_PERFORMANCE and UNSPECIFIED share forward enumeration,
+      // which already lists discrete GPUs first.
       hr = this->EnumAdapters(Adapter, &adapter);
     }
 

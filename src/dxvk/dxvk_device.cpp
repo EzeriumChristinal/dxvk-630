@@ -17,7 +17,6 @@ namespace dxvk {
       // (and how many worker threads to use) from this option set, and it
       // is constructed from the device init list before the ctor body runs.
       if (adapter->isGen9LowPower()) {
-        options.enableGen9Profile = true;
         if (options.enableDyasync == Tristate::Auto)
           options.enableDyasync = Tristate::True;
         if (options.useRawSsbo == Tristate::Auto)

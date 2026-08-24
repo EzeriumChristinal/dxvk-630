@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
@@ -28,36 +29,29 @@ namespace dxvk {
     DxvkPipelinePriority              priority;
   };
 
+    // Dyasync worker scaling: (cores - 1) * 5 / 7. Shared with the
+    // pipeline manager's normal-priority worker split.
+  inline uint32_t dyasyncBaseWorkers(uint32_t cpuCores) {
+    return ((std::max(1u, cpuCores) - 1u) * 5u) / 7u;
+  }
+
   class DxvkPipelineCompiler : public RcObject {
 
   public:
 
-    struct GraphicsQueueKey {
-      DxvkGraphicsPipeline* pipeline = nullptr;
-      size_t                stateHash = 0;
+    template<typename P>
+    struct QueueKey {
+      P*     pipeline  = nullptr;
+      size_t stateHash = 0;
 
-      bool operator==(const GraphicsQueueKey& other) const {
+      bool operator==(const QueueKey& other) const {
         return pipeline == other.pipeline && stateHash == other.stateHash;
       }
     };
 
-    struct GraphicsQueueKeyHash {
-      size_t operator()(const GraphicsQueueKey& key) const {
-        return size_t(uintptr_t(key.pipeline)) ^ key.stateHash;
-      }
-    };
-
-    struct ComputeQueueKey {
-      DxvkComputePipeline* pipeline = nullptr;
-      size_t               stateHash = 0;
-
-      bool operator==(const ComputeQueueKey& other) const {
-        return pipeline == other.pipeline && stateHash == other.stateHash;
-      }
-    };
-
-    struct ComputeQueueKeyHash {
-      size_t operator()(const ComputeQueueKey& key) const {
+    struct QueueKeyHash {
+      template<typename P>
+      size_t operator()(const QueueKey<P>& key) const {
         return size_t(uintptr_t(key.pipeline)) ^ key.stateHash;
       }
     };
@@ -69,11 +63,6 @@ namespace dxvk {
   bool queueCompilation(
           DxvkGraphicsPipeline*            pipeline,
     const DxvkGraphicsPipelineStateInfo& state,
-          DxvkPipelinePriority           priority);
-
-  bool queueCompilation(
-          DxvkComputePipeline*             pipeline,
-    const DxvkComputePipelineStateInfo&  state,
           DxvkPipelinePriority           priority);
 
   void stop();
@@ -91,8 +80,8 @@ namespace dxvk {
     std::deque<DxvkPipelineEntry> m_liveQueue;
     std::deque<DxvkPipelineEntry> m_backgroundQueue;
 
-    std::unordered_set<GraphicsQueueKey, GraphicsQueueKeyHash> m_queuedGraphicsPipelines;
-    std::unordered_set<ComputeQueueKey,  ComputeQueueKeyHash>  m_queuedComputePipelines;
+    std::unordered_set<QueueKey<DxvkGraphicsPipeline>, QueueKeyHash> m_queuedGraphicsPipelines;
+    std::unordered_set<QueueKey<DxvkComputePipeline>,  QueueKeyHash> m_queuedComputePipelines;
 
     std::vector<dxvk::thread>     m_workers;
 
@@ -111,8 +100,6 @@ namespace dxvk {
     bool waitForWork(DxvkPipelineEntry& entry);
 
     void compileAndCache(const DxvkPipelineEntry& entry);
-
-    void processEntry(const DxvkPipelineEntry& entry);
 
     void runCompilerThread();
 

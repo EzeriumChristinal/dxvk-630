@@ -1980,12 +1980,7 @@ namespace dxvk {
     if (!hEvent || !pdwCookie)
       return E_INVALIDARG;
 
-    DWORD cookie;
-    {
-      std::lock_guard lock(m_removedEventMutex);
-      cookie = ++m_removedEventCounter;
-      m_removedEvents[cookie] = hEvent;
-    }
+    DWORD cookie = m_removedEventCounter.fetch_add(1, std::memory_order_relaxed) + 1;
 
     *pdwCookie = cookie;
 
@@ -1998,8 +1993,7 @@ namespace dxvk {
 
   void STDMETHODCALLTYPE D3D11Device::UnregisterDeviceRemoved(
           DWORD                     dwCookie) {
-    std::lock_guard lock(m_removedEventMutex);
-    m_removedEvents.erase(dwCookie);
+    // Cookies carry no resources; unregistering is a no-op.
   }
 
 
