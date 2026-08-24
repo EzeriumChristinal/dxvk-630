@@ -32,4 +32,5 @@ Thumbs.db
 compile_commands.json
 .clangd
 WORK_PLAN.md
-DXVK-AUDIT.md
+# audit doc is tracked: AGENTS.md and every round reference it
+!DXVK-AUDIT.md
