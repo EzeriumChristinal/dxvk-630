@@ -487,8 +487,28 @@ namespace dxvk {
     auto& v = m_imageBarriers;
     uint32_t writeIdx = 0;
 
+    // Merge runs of adjacent subresource ranges into single barriers. A run
+    // folds along exactly ONE dimension (mips or layers) while the other
+    // dimension stays fixed, so the merged range is exactly the union of the
+    // merged barriers. Mixing dimensions could over-merge (a rectangle
+    // covering entries that were never emitted) and is not attempted.
+    enum : uint32_t { RunNone = 0, RunMips = 1, RunLayers = 2 };
+
     for (uint32_t i = 0; i < v.size(); ) {
+      const auto& head = v[i].subresourceRange;
+
+      auto sameLayers = [&head](const VkImageSubresourceRange& r) {
+        return r.baseArrayLayer == head.baseArrayLayer
+            && r.layerCount == head.layerCount;
+      };
+      auto sameMips = [&head](const VkImageSubresourceRange& r) {
+        return r.baseMipLevel == head.baseMipLevel
+            && r.levelCount == head.levelCount;
+      };
+
       uint32_t j = i + 1;
+      uint32_t mode = RunNone;
+
       while (j < v.size()
         && v[j].image == v[i].image
         && v[j].srcStageMask == v[i].srcStageMask
@@ -498,18 +518,53 @@ namespace dxvk {
         && v[j].oldLayout == v[i].oldLayout
         && v[j].newLayout == v[i].newLayout
         && v[j].subresourceRange.aspectMask == v[i].subresourceRange.aspectMask
-        && v[j].subresourceRange.baseArrayLayer == v[i].subresourceRange.baseArrayLayer
-        && v[j].subresourceRange.layerCount == v[i].subresourceRange.layerCount
         && v[j].srcQueueFamilyIndex == v[i].srcQueueFamilyIndex
-        && v[j].dstQueueFamilyIndex == v[i].dstQueueFamilyIndex
-        && v[j].subresourceRange.baseMipLevel == v[i].subresourceRange.baseMipLevel + v[i].subresourceRange.levelCount)
+        && v[j].dstQueueFamilyIndex == v[i].dstQueueFamilyIndex) {
+        const auto& prev = v[j - 1].subresourceRange;
+        const auto& cur  = v[j].subresourceRange;
+
+        // Mip/layer adjacency must never fire on VK_REMAINING_* values:
+        // the uint32 sums wrap, and any "merged" count would be garbage.
+        bool mipsAdjacent = cur.baseMipLevel == prev.baseMipLevel + prev.levelCount
+          && prev.levelCount != VK_REMAINING_MIP_LEVELS
+          && cur.levelCount != VK_REMAINING_MIP_LEVELS;
+        bool layersAdjacent = cur.baseArrayLayer == prev.baseArrayLayer + prev.layerCount
+          && prev.layerCount != VK_REMAINING_ARRAY_LAYERS
+          && cur.layerCount != VK_REMAINING_ARRAY_LAYERS;
+
+        bool extend = false;
+
+        if (mode == RunMips) {
+          extend = sameLayers(cur) && mipsAdjacent;
+        } else if (mode == RunLayers) {
+          extend = sameMips(cur) && layersAdjacent;
+        } else if (sameLayers(cur)) {
+          mode = RunMips;
+          extend = mipsAdjacent;
+        } else if (sameMips(cur)) {
+          mode = RunLayers;
+          extend = layersAdjacent;
+        }
+
+        if (!extend)
+          break;
+
         j++;
+      }
 
       if (j > i + 1) {
         VkImageMemoryBarrier2 merged = v[i];
-        uint64_t rangeEnd = uint64_t(v[j - 1].subresourceRange.baseMipLevel)
-                          + uint64_t(v[j - 1].subresourceRange.levelCount);
-        merged.subresourceRange.levelCount = uint32_t(rangeEnd - v[i].subresourceRange.baseMipLevel);
+
+        if (mode == RunLayers) {
+          uint64_t rangeEnd = uint64_t(v[j - 1].subresourceRange.baseArrayLayer)
+                            + uint64_t(v[j - 1].subresourceRange.layerCount);
+          merged.subresourceRange.layerCount = uint32_t(rangeEnd - head.baseArrayLayer);
+        } else {
+          uint64_t rangeEnd = uint64_t(v[j - 1].subresourceRange.baseMipLevel)
+                            + uint64_t(v[j - 1].subresourceRange.levelCount);
+          merged.subresourceRange.levelCount = uint32_t(rangeEnd - head.baseMipLevel);
+        }
+
         v[writeIdx++] = merged;
       } else {
         v[writeIdx++] = v[i];

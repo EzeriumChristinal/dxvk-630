@@ -2269,6 +2269,9 @@ namespace dxvk {
           VkMemoryRequirements2&  memoryRequirements) const {
     auto vk = m_device->vkd();
 
+    if (!m_device->features().vk13.maintenance4)
+      return false;
+
     VkDeviceBufferMemoryRequirements info = { VK_STRUCTURE_TYPE_DEVICE_BUFFER_MEMORY_REQUIREMENTS };
     info.pCreateInfo = &createInfo;
 
@@ -2281,6 +2284,9 @@ namespace dxvk {
     const VkImageCreateInfo&      createInfo,
           VkMemoryRequirements2&  memoryRequirements) const {
     auto vk = m_device->vkd();
+
+    if (!m_device->features().vk13.maintenance4)
+      return false;
 
     VkDeviceImageMemoryRequirements info = { VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS };
     info.pCreateInfo = &createInfo;
@@ -2634,9 +2640,11 @@ namespace dxvk {
           DxvkMemoryType&       type) {
     auto& pool = type.devicePool;
 
-    // Doing this on integrated graphics would be harmful, so don't'
+    // Doing this on Gen9 iGPUs would be harmful, so don't. Keep the gate
+    // on the target part (matches enableDefrag) so non-Gen9 UMA devices
+    // behave like upstream and still evict under pressure.
     if (pool.chunks.empty() || !type.heap->enableEviction
-     || m_device->isUnifiedMemoryArchitecture())
+     || m_device->adapter()->isGen9LowPower())
       return;
 
     // Work out how much memory we should ideally leave unused

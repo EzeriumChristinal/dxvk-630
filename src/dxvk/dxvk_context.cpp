@@ -1187,7 +1187,10 @@ namespace dxvk {
       const Rc<DxvkPagedResource>&    resource,
             VkImageLayout             layout) {
     DxvkResourceAccess access;
-    access.stages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+    // Must stay ALL_COMMANDS: an externally acquired resource may have been
+    // written by the other API (D3D12 interop) using any pipeline stage,
+    // including compute and transfer. Narrowing this skips waits.
+    access.stages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     access.access = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
     access.buffer = dynamic_cast<DxvkBuffer*>(resource.ptr());
     access.image = dynamic_cast<DxvkImage*>(resource.ptr());
@@ -1232,7 +1235,11 @@ namespace dxvk {
     endCurrentPass(true);
 
     DxvkResourceAccess access;
-    access.stages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+    // Must stay ALL_COMMANDS: the external consumer (D3D12 interop) may
+    // access the resource with any stage, and we may have written it with
+    // compute or transfer ourselves. Narrowing this drops visibility of
+    // those writes when handing the resource back.
+    access.stages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     access.access = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
     access.buffer = dynamic_cast<DxvkBuffer*>(resource.ptr());
     access.image = dynamic_cast<DxvkImage*>(resource.ptr());

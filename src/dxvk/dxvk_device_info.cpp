@@ -893,22 +893,38 @@ namespace dxvk {
       ENABLE_FEATURE(vk12, runtimeDescriptorArray, true),
       ENABLE_FEATURE(vk12, samplerFilterMinmax, false),
       ENABLE_FEATURE(vk12, samplerMirrorClampToEdge, true),
-      ENABLE_FEATURE(vk12, scalarBlockLayout, false),
+      /* Required (upstream parity): SPIR-V codegen decorates arbitrary
+       * UBO/SSBO member offsets and emits Int8-capped sub-dword push-data
+       * lowerings unconditionally; without these the shaders miscompile
+       * or fail validation instead of failing device creation cleanly. */
+      ENABLE_FEATURE(vk12, scalarBlockLayout, true),
       ENABLE_FEATURE(vk12, shaderFloat16, false),
-      ENABLE_FEATURE(vk12, shaderInt8, false),
+      ENABLE_FEATURE(vk12, shaderInt8, true),
       ENABLE_FEATURE(vk12, shaderOutputViewportIndex, false),
       ENABLE_FEATURE(vk12, shaderOutputLayer, false),
       ENABLE_FEATURE(vk12, timelineSemaphore, true),
-      ENABLE_FEATURE(vk12, uniformBufferStandardLayout, false),
-      ENABLE_FEATURE(vk12, vulkanMemoryModel, false),
+      ENABLE_FEATURE(vk12, uniformBufferStandardLayout, true),
+      /* Required: emitMemoryModel() declares MemoryModelVulkan for every shader. */
+      ENABLE_FEATURE(vk12, vulkanMemoryModel, true),
 
-      ENABLE_FEATURE(vk13, inlineUniformBlock, false),
+      /* Required: createSpecDataSetLayout uses INLINE_UNIFORM_BLOCK whenever
+       * descriptor buffers are active, with no feature check. */
+      ENABLE_FEATURE(vk13, inlineUniformBlock, true),
       ENABLE_FEATURE(vk13, computeFullSubgroups, false),
       ENABLE_FEATURE(vk13, dynamicRendering, true),
-      ENABLE_FEATURE(vk13, maintenance4, false),
+      /* Required: compute shaders emit OpExecutionModeId LocalSizeId
+       * unconditionally (VK_KHR_maintenance4 / Vulkan 1.3). The allocator
+       * fn-pointer guards in dxvk_memory.cpp stay as defense-in-depth. */
+      ENABLE_FEATURE(vk13, maintenance4, true),
       ENABLE_FEATURE(vk13, robustImageAccess, false),
       ENABLE_FEATURE(vk13, pipelineCreationCacheControl, false),
-      ENABLE_FEATURE(vk13, shaderDemoteToHelperInvocation, false),
+      /* Must stay required: the shader backend unconditionally emits
+       * OpDemoteToHelperInvocation for any pixel shader with discard or
+       * texkill (no fallback lowering exists in dxbc-spirv). Marking it
+       * optional lets device creation succeed and then breaks every
+       * discard-containing shader on drivers without the feature. */
+      ENABLE_FEATURE(vk13, shaderDemoteToHelperInvocation, true),
+      /* Optional is safe: the compiler never emits workgroup init ops. */
       ENABLE_FEATURE(vk13, shaderZeroInitializeWorkgroupMemory, false),
       ENABLE_FEATURE(vk13, subgroupSizeControl, false),
       ENABLE_FEATURE(vk13, synchronization2, true),
@@ -1023,13 +1039,17 @@ namespace dxvk {
       ENABLE_EXT(khrExternalMemoryWin32, false),
       ENABLE_EXT(khrExternalSemaphoreWin32, false),
 
-      /* LOAD_OP_NONE for certain tiler optimizations. Core feature
-       * in Vulkan 1.4, so probably supported by everything we need. */
-      ENABLE_EXT(khrLoadStoreOpNone, false),
+      /* Required: adjustAttachmentLoadStoreOps() emits LOAD_OP_NONE /
+       * STORE_OP_NONE unconditionally on untouched attachments. */
+      ENABLE_EXT(khrLoadStoreOpNone, true),
 
-      /* Maintenance features, relied on in various parts of the code */
-      ENABLE_EXT_FEATURE(khrMaintenance5, maintenance5, false),
-      ENABLE_EXT_FEATURE(khrMaintenance6, maintenance6, false),
+      /* Required (upstream parity): the command stream calls
+       * vkCmdBindIndexBuffer2KHR / vkGetDeviceImageSubresourceLayoutKHR [m5]
+       * and vkCmdBindDescriptorSets2KHR / vkCmdPushConstants2KHR /
+       * vkCmdSetDescriptorBufferOffsets2EXT [m6] unconditionally; without
+       * these extensions those entry points are NULL. */
+      ENABLE_EXT_FEATURE(khrMaintenance5, maintenance5, true),
+      ENABLE_EXT_FEATURE(khrMaintenance6, maintenance6, true),
       ENABLE_EXT_FEATURE(khrMaintenance7, maintenance7, false),
       ENABLE_EXT_FEATURE(khrMaintenance8, maintenance8, false),
       ENABLE_EXT_FEATURE(khrMaintenance9, maintenance9, false),

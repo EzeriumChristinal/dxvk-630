@@ -127,7 +127,11 @@ namespace dxvk {
     barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
     barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
-    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+    // Must stay ALL_COMMANDS: the blit write is not visible to context
+    // access tracking, so any later consumer of the backbuffer (transfer
+    // copies such as GetFrontBufferData, compute reads) relies on THIS
+    // barrier for synchronization.
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     barrier.oldLayout = renderLayout;
     barrier.newLayout = dstView->image()->info().layout;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

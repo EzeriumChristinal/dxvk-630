@@ -300,12 +300,14 @@ namespace dxvk {
     } else {
       // Hold the frame mutex while waiting so that destroySwapchain,
       // which destroys the present fences under the same mutex, cannot
-      // free the fence out from under vkWaitForFences.
+      // free the fence out from under vkWaitForFences. Wait with a
+      // bounded timeout so a fence that never signals cannot hang the
+      // finish thread and, via the same mutex, a swapchain recreate.
       std::unique_lock lock(m_frameMutex);
 
       if (m_hasSwapchainMaintenance1 && m_lastPresentFence && m_lastPresentFenceFrameId == frameId) {
         VkResult vr = m_vkd->vkWaitForFences(m_vkd->device(),
-          1, &m_lastPresentFence, VK_TRUE, ~0ull);
+          1, &m_lastPresentFence, VK_TRUE, 1'000'000'000ull);
         if (vr)
           Logger::err(str::format("Presenter: Failed to wait for present fence: ", vr));
       }

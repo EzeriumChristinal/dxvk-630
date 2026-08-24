@@ -55,21 +55,13 @@ namespace dxvk {
     if (likely(instance))
       return instance->handle;
 
-    if (m_compiler) {
-      // Dispatch to async compiler, queue compilation inline
-      std::lock_guard<dxvk::mutex> lock(m_mutex);
-      instance = this->findInstance(state);
-
-      if (!instance) {
-        instance = this->createInstance(state);
-        m_compiler->queueCompilation(this, state,
-          DxvkPipelinePriority::Normal);
-      }
-
-      return instance->handle;
-    }
-
-    // Slow path for compute shaders that do use spec constants
+    // Slow path for compute shaders that do use spec constants. This is
+    // inherently synchronous: the pipeline handle must exist before the
+    // draw can be recorded, and there is no placeholder mechanism for
+    // compute. Do NOT queue this to the async compiler - createInstance()
+    // already created the pipeline above, so a queued job would find the
+    // instance and bail, wasting a queue slot and a worker wakeup per
+    // unique spec-constant state.
     {
       std::lock_guard<dxvk::mutex> lock(m_mutex);
       instance = this->findInstance(state);
