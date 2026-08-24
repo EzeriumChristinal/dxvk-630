@@ -127,27 +127,18 @@ namespace dxvk {
       }
     }
 
-    // Cache adapter identity for IsCurrent() change detection
+    // Cache adapter identity for IsCurrent() change detection. Physical
+    // device handles are unique and stable per VkInstance, so comparing
+    // the sorted handle set is sufficient to detect adapter arrival or
+    // removal - no per-device property queries needed on later calls.
     auto vki = m_instance->vki();
     uint32_t numAdapters = 0;
-    if (vki->vkEnumeratePhysicalDevices(vki->instance(), &numAdapters, nullptr) == VK_SUCCESS) {
-      m_adapterCount = numAdapters;
-      m_adapterHash = 0;
-      small_vector<VkPhysicalDevice, 8> adapters(numAdapters);
-      if (numAdapters && vki->vkEnumeratePhysicalDevices(vki->instance(), &numAdapters, adapters.data()) == VK_SUCCESS) {
-        for (uint32_t i = 0; i < numAdapters; i++) {
-          VkPhysicalDeviceProperties2 props = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-          VkPhysicalDeviceIDProperties idProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES };
-          props.pNext = &idProps;
-          vki->vkGetPhysicalDeviceProperties2(adapters[i], &props);
-          if (idProps.deviceLUIDValid) {
-            for (uint32_t b = 0; b < VK_LUID_SIZE; b++)
-              m_adapterHash = m_adapterHash * 31 + idProps.deviceLUID[b];
-          }
-          m_adapterHash = m_adapterHash * 31 + props.properties.vendorID;
-          m_adapterHash = m_adapterHash * 31 + props.properties.deviceID;
-        }
-      }
+    if (vki->vkEnumeratePhysicalDevices(vki->instance(), &numAdapters, nullptr) == VK_SUCCESS && numAdapters) {
+      m_adapters.resize(numAdapters);
+      if (vki->vkEnumeratePhysicalDevices(vki->instance(), &numAdapters, m_adapters.data()) == VK_SUCCESS)
+        std::sort(m_adapters.begin(), m_adapters.end());
+      else
+        m_adapters.clear();
     }
 
     // If any monitors are left on the list, enable the
@@ -451,8 +442,7 @@ namespace dxvk {
   
   
   HRESULT STDMETHODCALLTYPE DxgiFactory::MakeWindowAssociation(HWND WindowHandle, UINT Flags) {
-    m_windowAssociation = WindowHandle;
-    m_windowAssociationFlags = Flags;
+    m_windowAssociation.store(WindowHandle);
     return S_OK;
   }
 
@@ -463,28 +453,18 @@ namespace dxvk {
     if (vki->vkEnumeratePhysicalDevices(vki->instance(), &numAdapters, nullptr) != VK_SUCCESS)
       return TRUE;
 
-    if (numAdapters != m_adapterCount)
+    if (numAdapters != m_adapters.size())
       return FALSE;
 
-    uint64_t hash = 0;
-    small_vector<VkPhysicalDevice, 8> adapters(numAdapters);
-    if (numAdapters && vki->vkEnumeratePhysicalDevices(vki->instance(), &numAdapters, adapters.data()) != VK_SUCCESS)
+    if (!numAdapters)
       return TRUE;
 
-    for (uint32_t i = 0; i < numAdapters; i++) {
-      VkPhysicalDeviceProperties2 props = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-      VkPhysicalDeviceIDProperties idProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES };
-      props.pNext = &idProps;
-      vki->vkGetPhysicalDeviceProperties2(adapters[i], &props);
-      if (idProps.deviceLUIDValid) {
-        for (uint32_t b = 0; b < VK_LUID_SIZE; b++)
-          hash = hash * 31 + idProps.deviceLUID[b];
-      }
-      hash = hash * 31 + props.properties.vendorID;
-      hash = hash * 31 + props.properties.deviceID;
-    }
+    small_vector<VkPhysicalDevice, 8> adapters(numAdapters);
+    if (vki->vkEnumeratePhysicalDevices(vki->instance(), &numAdapters, adapters.data()) != VK_SUCCESS)
+      return TRUE;
 
-    return hash == m_adapterHash ? TRUE : FALSE;
+    std::sort(adapters.begin(), adapters.end());
+    return std::equal(adapters.begin(), adapters.end(), m_adapters.begin()) ? TRUE : FALSE;
   }
   
   

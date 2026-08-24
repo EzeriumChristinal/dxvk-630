@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <vector>
 #include <mutex>
 
@@ -202,11 +203,12 @@ namespace dxvk {
 
     D3DDestructionNotifier m_destructionNotifier;
 
-    uint32_t              m_adapterCount = 0;
-    uint64_t              m_adapterHash  = 0;
+    // Sorted set of physical device handles captured at construction;
+    // IsCurrent() compares a fresh enumeration against this to detect
+    // adapter arrival/removal without querying device properties.
+    std::vector<VkPhysicalDevice> m_adapters;
 
-    HWND   m_windowAssociation = nullptr;
-    UINT   m_windowAssociationFlags = 0;
+    std::atomic<HWND> m_windowAssociation = nullptr;
       
 
     HRESULT STDMETHODCALLTYPE CreateSwapChainBase(

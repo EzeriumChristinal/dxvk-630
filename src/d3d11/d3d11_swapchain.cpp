@@ -413,7 +413,12 @@ namespace dxvk {
 
     m_frameId += 1;
 
-    if (m_framePacer)
+    // Skip the frame pacer sleep when an explicit frame rate limit is set:
+    // the fps limiter already paces frames, so both sleeping would add up
+    // and push the frame rate below the target (O-14). Also skip unless
+    // LowLatency mode is active: beginFrame state is only consumed by
+    // LowLatency wake prediction.
+    if (m_framePacer && !m_targetFrameRate && m_framePacer->needsGpuSignal())
       m_framePacer->beginFrame();
 
     // Present from CS thread so that we don't

@@ -383,7 +383,15 @@ namespace dxvk {
       auto sequenceNumber = pResource->GetSequenceNumber();
 
       if (MapType != D3D11_MAP_READ && !MapFlags && bufferSize <= D3D11Initializer::MaxMemoryPerSubmission) {
-        if (buffer->isInUse(DxvkAccess::Write) || buffer->isInUse(DxvkAccess::Read))
+        // Access refs attach to a chunk only when the CS thread executes it,
+        // so a dispatched-but-unexecuted chunk is invisible to isInUse().
+        // Sync unless every chunk up to this resource's sequence number has
+        // executed, so that the hasRw/hasWoAccess reads below are accurate
+        // and the invalidate-preserve promotion stays available when a
+        // queued read would otherwise force a full GPU wait later.
+        bool csIdle = m_csThread.lastSequenceNumber() >= sequenceNumber;
+
+        if (!csIdle || buffer->isInUse(DxvkAccess::Write) || buffer->isInUse(DxvkAccess::Read))
           SynchronizeCsThread(sequenceNumber);
 
         bool hasWoAccess = buffer->isInUse(DxvkAccess::Write);
@@ -749,7 +757,14 @@ namespace dxvk {
     if (likely(CopyFlags != D3D11_COPY_NO_OVERWRITE)) {
       auto buffer = pDstBuffer->GetBuffer();
 
-      if (buffer->isInUse(DxvkAccess::Write) || buffer->isInUse(DxvkAccess::Read)) {
+      // Access refs attach to a chunk only when the CS thread executes it,
+      // so isInUse() alone cannot see dispatched-but-unexecuted work. Only
+      // write in place when every recorded chunk has been executed AND the
+      // resource has no outstanding GPU access; otherwise rename, which is
+      // safe under any amount of pending CS/GPU work.
+      bool csIdle = m_csThread.lastSequenceNumber() >= GetCurrentSequenceNumber();
+
+      if (!csIdle || buffer->isInUse(DxvkAccess::Write) || buffer->isInUse(DxvkAccess::Read)) {
         auto bufferSlice = pDstBuffer->DiscardSlice(&m_allocationCache);
         mapPtr = bufferSlice->mapPtr();
 
@@ -907,7 +922,12 @@ namespace dxvk {
     // otherwise we cannot accurately determine if the resource is
     // actually being used by the GPU right now.
     if (!Resource.isInUse(access)) {
-      SynchronizeCsThread(SequenceNumber);
+      // Fast path: once every chunk up to SequenceNumber has executed,
+      // synchronizing would be a no-op; skip the CS-thread roundtrip.
+      // Access refs are attached at execution time, so isInUse() above
+      // is fully accurate in this state.
+      if (m_csThread.lastSequenceNumber() < SequenceNumber)
+        SynchronizeCsThread(SequenceNumber);
 
       if (!Resource.isInUse(access))
         return true;

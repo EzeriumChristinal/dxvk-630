@@ -168,7 +168,12 @@ namespace dxvk {
       return PresentImageGDI(m_window);
 #endif
 
-    if (m_framePacer)
+    // Skip the frame pacer sleep when an explicit frame rate limit is set:
+    // the fps limiter already paces frames, so both sleeping would add up
+    // and push the frame rate below the target (O-14). Also skip unless
+    // LowLatency mode is active: beginFrame state is only consumed by
+    // LowLatency wake prediction.
+    if (m_framePacer && !m_targetFrameRate && m_framePacer->needsGpuSignal())
       m_framePacer->beginFrame();
 
     try {
@@ -229,13 +234,6 @@ namespace dxvk {
   HRESULT STDMETHODCALLTYPE D3D9SwapChainEx::GetFrontBufferData(IDirect3DSurface9* pDestSurface) {
     D3D9DeviceLock lock = m_parent->LockDevice();
 
-    if (!SwapWithFrontBuffer() && m_parent->GetOptions()->extraFrontbuffer) {
-      const auto& backbuffer = m_backBuffers[0];
-      const auto& frontbuffer = GetFrontBuffer();
-      if (FAILED(m_parent->StretchRect(backbuffer.ptr(), nullptr, frontbuffer.ptr(), nullptr, D3DTEXF_NONE)))
-        Logger::err("Failed to blit to front buffer");
-    }
-
     // This function can do absolutely everything!
     // Copies the front buffer between formats with an implicit resolve.
     // Oh, and the dest is systemmem...
@@ -261,9 +259,18 @@ namespace dxvk {
 
     if (unlikely(dstTexInfo->Desc()->Pool != D3DPOOL_SYSTEMMEM && dstTexInfo->Desc()->Pool != D3DPOOL_SCRATCH))
       return D3DERR_INVALIDCALL;
-    
+
     if (unlikely(m_parent->IsDeviceLost())) {
       return D3DERR_DEVICELOST;
+    }
+
+    // Only blit to the extra front buffer after validating the call;
+    // on rejected calls the blit result would be discarded anyway.
+    if (!SwapWithFrontBuffer() && m_parent->GetOptions()->extraFrontbuffer) {
+      const auto& backbuffer = m_backBuffers[0];
+      const auto& frontbuffer = GetFrontBuffer();
+      if (FAILED(m_parent->StretchRect(backbuffer.ptr(), nullptr, frontbuffer.ptr(), nullptr, D3DTEXF_NONE)))
+        Logger::err("Failed to blit to front buffer");
     }
 
     VkExtent3D dstTexExtent = dstTexInfo->GetExtentMip(dst->GetMipLevel());
