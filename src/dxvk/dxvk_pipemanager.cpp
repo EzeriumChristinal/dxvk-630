@@ -115,29 +115,24 @@ namespace dxvk {
 
     m_workers.reserve(workerCount);
 
-    try {
-      for (size_t i = 0; i < workerCount; i++) {
-        DxvkPipelinePriority priority = DxvkPipelinePriority::Normal;
+    // No try/catch around the spawn loop: callers hold m_lock across
+    // startWorkers(), and freshly spawned workers cannot acquire m_lock to
+    // observe a stopped flag, so joining them here would self-deadlock.
+    // On exception the already-started workers keep idling (upstream
+    // behavior) and are joined by stopWorkers() at teardown.
+    for (size_t i = 0; i < workerCount; i++) {
+      DxvkPipelinePriority priority = DxvkPipelinePriority::Normal;
 
-        if (i >= npWorkerCount)
-          priority = DxvkPipelinePriority::High;
-        else if (i < lpWorkerCount)
-          priority = DxvkPipelinePriority::Low;
+      if (i >= npWorkerCount)
+        priority = DxvkPipelinePriority::High;
+      else if (i < lpWorkerCount)
+        priority = DxvkPipelinePriority::Low;
 
-        auto& worker = m_workers.emplace_back([this, priority] {
-          runWorker(priority);
-        });
-        
-        worker.set_priority(ThreadPriority::Lowest);
-      }
-    } catch (...) {
-      m_workersRunning.store(false);
-      for (auto& worker : m_workers) {
-        if (worker.joinable())
-          worker.join();
-      }
-      m_workers.clear();
-      throw;
+      auto& worker = m_workers.emplace_back([this, priority] {
+        runWorker(priority);
+      });
+
+      worker.set_priority(ThreadPriority::Lowest);
     }
 
     Logger::info(str::format("DXVK: Using ", workerCount, " compiler threads"));

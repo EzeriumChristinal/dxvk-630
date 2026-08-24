@@ -185,7 +185,21 @@ namespace dxvk {
         return false;
     }
 
-    queue.push_back(std::move(entry));
+    // Roll back the dedupe key if the push throws, else a leaked key
+    // would permanently suppress this state's optimized compile.
+    // deque::push_back has a strong guarantee: entry is intact on throw.
+    try {
+      queue.push_back(std::move(entry));
+    } catch (...) {
+      if (entry.pipeline)
+        m_queuedGraphicsPipelines.erase(
+          GraphicsQueueKey { entry.pipeline, entry.state.hash() });
+      else if (entry.computePipeline)
+        m_queuedComputePipelines.erase(
+          ComputeQueueKey { entry.computePipeline, entry.computeState.hash() });
+      throw;
+    }
+
     m_cond.notify_one();
     return true;
   }
