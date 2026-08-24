@@ -1,70 +1,58 @@
 # dxvk-630
 
-DXVK fork tuned for **Intel UHD 630 (Gen9.5)** iGPUs on low-power UMA systems with constrained memory bandwidth.
+DXVK fork tuned for **Intel UHD 630 (Gen9.5)** iGPUs on low-power UMA systems with
+constrained memory bandwidth.
 
-Built on DXVK v3.0.2 with cherry-picks from the [Sarek](https://github.com/HansKristian-Work/dxvk) dyasync branch for async pipeline compilation and Gen9 low-power profile support.
+Built on DXVK v3.0.2 with picks from the Sarek dyasync branch for async pipeline
+compilation and a Gen9 low-power profile. Every change is audited: see
+[DXVK-AUDIT.md](DXVK-AUDIT.md) - 16 rounds, every finding tracked, 0 critical or high
+bugs open.
 
 ## Changes from upstream DXVK
 
 | Change | Description |
 |--------|-------------|
-| **Gen9 low-power profile** | Auto-detects UHD 630 hardware, applies memory budget caps (1024 MB), disables raw SSBO, enables async compilation |
-| **Async pipeline compilation (dyasync)** | Background thread pipeline compilation eliminates stutter on slow iGPU |
-| **VkPipelineCache** | Persistent pipeline cache saved to disk, reused across runs |
-| **Narrowed pipeline barriers** | `ALL_COMMANDS_BIT` replaced with stage-specific barriers (`ALL_GRAPHICS_BIT`, `ALL_TRANSFER_BIT`) |
-| **Relaxed barriers** | `d3d11.relaxedBarriers = True` by default |
-| **Max-perf defaults** | Aggressive `dxvk.conf`: async compile, relaxed barriers, MSAA disabled, low anisotropy, LOD bias, capped tessellation, vsync off, UMA memory tuning |
-| **Frame pacer (Phase 6, Sarek port)** | Three modes: max-frame-latency (default), low-latency (predictive), min-latency (clamp only) |
-| **ALLOW_TEARING flag forwarding** | `VK_PRESENT_MODE_IMMEDIATE_KHR` support for DXGI flip model |
-| **forceHdr option** | Forces HDR10 output on supported displays |
-| **Gen9 profile respects user config** | User `dxvk.conf` overrides built-in Gen9 profile defaults |
-| **Missing Gen9 device IDs** | Added Broxton/APL/0x22xx Gen9 LP device IDs |
-| **IsCurrent adapter tracking** | `IDXGIOutput::IsCurrent` re-enumerates Vulkan physical devices, detects hotplug |
-| **Threading/fix batch** | Shader cache race fix, DXGI options shift overflow, `RegisterDeviceRemovedEvent`, `MakeWindowAssociation`, sync interval fix, `BufferCount` pick fix |
-| **NT handle leak fix** | `CloseHandle` on failure paths in D3D11 device NT handle open |
-| **Present1 dirty rects** | Null `pPresentParameters` converted to empty params |
-| **LTO enabled** | Link-time optimization for release builds |
-| **Per-type pipeline locks** | Single `m_pipelineMutex` split into compute + graphics + pipeline mutexes |
-| **D3D9 frame pacer wiring** | FramePacer wired into D3D9 swapchain |
-| **Pipecompiler bugfixes** | Removed spurious `static` on `computeFallbackKey()` using `this` |
-| **Audit fixes (rounds 1-5)** | 61 bugfixes applied, 0 high-priority bugs remaining: UAF in pipecompiler/framepacer, data races, queue starvation, thundering herd, OOB reads, chunk pool leak, callback reentrancy, lazy frontbuffer blit, monitor deadlock, pipeline mutex split, dedupe, Gen9 options resolution. 15 issues deferred (all low-risk or require Vulkan timing extensions). |
+| Gen9 low-power profile | Auto-detects UHD 630-class hardware, caps memory budget at half the largest heap, disables raw SSBO, enables async compilation. User `dxvk.conf` overrides built-in defaults |
+| Dyasync pipeline compilation | Background threads compile pipelines off the hot path - no stutter on slow iGPUs. `dxvk.enableDyasync`, `dxvk.numDyasyncThreads` |
+| Frame pacer | Three modes: max-frame-latency (default), low-latency (predictive wake), min-latency. `dxvk.framePace` or `DXVK_FRAME_PACE` env, `dxvk.lowLatencyOffset` fine-tuning |
+| Narrowed pipeline barriers | `ALL_COMMANDS_BIT` replaced with stage-specific masks where proven safe (SDMA transfers); relaxed barriers available |
+| Pipeline cache persistence | Cache saved to disk at exit, reused across runs, teardown under proper host lock |
+| ALLOW_TEARING / forceHdr | Immediate present mode for DXGI flip model; forced HDR10 option |
+| Gen9 device IDs | Broxton/APL and 0x22xx Gen9 LP IDs added to detection |
+| IsCurrent adapter tracking | Sorted physical-device handle cache detects hotplug without per-call property queries |
+| Link-time optimization | Release builds use LTO |
+| Per-type pipeline locks | Compute / graphics pipeline mutex split |
+| D3D9 frame pacer wiring | FramePacer wired into the D3D9 swapchain alongside D3D11 |
+| Audit fixes | Rounds 5-16: UAFs, deadlocks, data races, barrier correctness, overflow guards, memory-policy fixes. Full per-finding status in DXVK-AUDIT.md |
 
 ## Changes from Sarek
 
-Sarek contributed dyasync infrastructure and Gen9 device detection. dxvk-630 adapts and simplifies for UHD 630 target only:
-
-| Sarek feature | dxvk-630 status |
-|---------------|-----------------|
-| Async pipeline compilation (dyasync) | Kept, wired into auto-detected Gen9 profile |
-| Gen9 low-power device profile | Kept, simplified — no multi-GPU branching |
-| Frame pacer (Phase 6) | Ported with three latency modes |
-| Multi-vendor GPU profiles (NVIDIA/AMD) | Not ported — Intel UHD 630 only |
+Sarek contributed the dyasync infrastructure and Gen9 detection. This fork adapts both
+for the UHD 630 target only: no multi-vendor GPU profiles, simplified profile resolution,
+frame pacer ported with three latency modes instead of Sarek's phase system.
 
 ## Building
 
-```
-git clone https://github.com/EzeriumChristinal/dxvk-630.git
-cd dxvk-630
+Toolchain paths for both hosts are in [../AGENTS.md](../AGENTS.md). Short form:
 
-meson setup --cross-file build-win64.txt --buildtype debug build-debug
-ninja -C build-debug
+    git clone https://github.com/EzeriumChristinal/dxvk-630.git
+    cd dxvk-630
+    meson setup --cross-file build-win64.txt --buildtype release build-release
+    ninja -C build-release
 
-meson setup --cross-file build-win64.txt --buildtype release build-release
-ninja -C build-release
-```
-
-Requires llvm-mingw (ucrt), glslangValidator, meson 1.11+, and ninja. See [Build instructions](https://github.com/doitsujin/dxvk#build-instructions) from upstream DXVK for details.
-
-**Windows toolchain setup:**
-- llvm-mingw-20260616-ucrt-x86_64 (or newer), glslang, meson, ninja
-- Add to PATH or use absolute paths in cross-file
-- Run meson with `--cross-file build-win64.txt` (supplied)
+Output: 5 DLLs under `build-release/src/{d3d8,d3d9,d3d10,d3d11,dxgi}/`. Requires
+llvm-mingw (ucrt), glslangValidator, meson 1.11+, ninja. Cross-compiles to
+`x86_64-w64-mingw32` from Linux or Windows.
 
 ## Configuration
 
-Shipped `dxvk.conf` contains all performance tweaks. Place next to `dxvk.dll` or set `DXVK_CONFIG_FILE`. Per-app overrides via `dxvk.conf` in game directory.
+Shipped `dxvk.conf` carries the tuned defaults. Place it next to `dxvk.dll`, point
+`DXVK_CONFIG_FILE` at it, or drop a per-game `dxvk.conf` in the game directory. Fork-specific
+keys: `dxvk.enableDyasync` (auto/on/off), `dxvk.numDyasyncThreads` (0 = auto),
+`dxvk.framePace` (empty / low-latency / min-latency), `dxvk.lowLatencyOffset` (microseconds,
+-10000..10000), `dxvk.maxMemoryBudget` (bytes; Gen9 auto = largest heap / 2).
 
 ## Credits
 
-- [DXVK](https://github.com/doitsujin/dxvk) — upstream project by Philip Rebohr
-- [Sarek](https://github.com/HansKristian-Work/dxvk) — dyasync and Gen9 profile by Hans-Kristian Arntzen
+- [DXVK](https://github.com/doitsujin/dxvk) - upstream project by Philip Rebohle
+- [DXVK-Sarek](https://github.com/pythonlover02/DXVK-Sarek) - dyasync and frame-pacer reference
