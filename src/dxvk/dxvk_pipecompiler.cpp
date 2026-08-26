@@ -54,7 +54,16 @@ namespace dxvk {
 
     Logger::info(str::format("DXVK: Using ", numWorkers, " dyasync compiler threads"));
 
-    this->spawnWorkers(numWorkers);
+    // If worker spawn throws mid-way the dtor will never run, so stop and
+    // join what was already spawned here; the threads observe m_stop in
+    // their wait predicate and exit without touching freed memory (R19-3).
+    try {
+      this->spawnWorkers(numWorkers);
+    } catch (...) {
+      this->requestStop();
+      this->joinAll();
+      throw;
+    }
   }
 
 

@@ -441,6 +441,7 @@ namespace dxvk {
       cSync           = sync,
       cPresenter      = m_presenter,
       cPacer          = m_framePacer,
+      cPaceActive     = !m_targetFrameRate,
       cLatency        = m_latency,
       cColorSpace     = m_colorSpace,
       cFrameId        = m_frameId
@@ -464,7 +465,7 @@ namespace dxvk {
       // Submit current command list and present
       ctx->synchronizeWsi(cSync);
 
-      if (cPacer && cPacer->needsGpuSignal()) {
+      if (cPacer && cPaceActive && cPacer->needsGpuSignal()) {
         ctx->signal(cPacer->signal(), cFrameId);
         cPacer->endFrame(cFrameId);
       }

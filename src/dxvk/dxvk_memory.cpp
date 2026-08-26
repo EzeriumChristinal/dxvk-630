@@ -2800,9 +2800,12 @@ namespace dxvk {
       // a stress-test scenario, see https://github.com/doitsujin/dxvk/issues/4395.
       // This issue does not seem to affect Battlemage GPUs, which have a minimum
       // reported subgroup size of 16 as opposed to 8.
-      if (m_device->adapter()->matchesDriver(VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA)
-       && m_device->features().vk13.subgroupSizeControl)
-        return m_device->properties().vk13.minSubgroupSize >= 16u;
+      if (m_device->adapter()->matchesDriver(VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA))
+        // Vulkan 1.2 target: devices without subgroupSizeControl are
+        // pre-Skylake ANV, which upstream's minSubgroupSize>=16 check
+        // excludes anyway (Genshin bug class), so defrag stays off.
+        return m_device->features().vk13.subgroupSizeControl
+            && m_device->properties().vk13.minSubgroupSize >= 16u;
 
       return true;
     } else {

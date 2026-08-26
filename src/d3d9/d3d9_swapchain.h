@@ -157,6 +157,11 @@ namespace dxvk {
 
     D3D9WindowContext*        m_wctx = nullptr;
 
+    // Swapchain-global monotonic frame counter. Fresh window contexts seed
+    // from this so the (swapchain-lifetime) FramePacer never observes a
+    // regressed frameId after Invalidate() erases an entry (O-19).
+    uint64_t                  m_frameIdCounter = D3D9DeviceEx::MaxFrameLatency;
+
     std::vector<Com<D3D9Surface, false>> m_backBuffers;
     
     RECT                      m_srcRect;

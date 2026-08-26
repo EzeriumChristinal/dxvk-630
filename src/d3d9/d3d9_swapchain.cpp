@@ -187,17 +187,22 @@ namespace dxvk {
       return PresentImageGDI(m_window);
 #endif
 
-    // Skip the frame pacer sleep when an explicit frame rate limit is set:
-    // the fps limiter already paces frames, so both sleeping would add up
-    // and push the frame rate below the target (O-14). Also skip unless
-    // LowLatency mode is active: beginFrame state is only consumed by
-    // LowLatency wake prediction.
-    if (m_framePacer && !m_targetFrameRate && m_framePacer->needsGpuSignal())
-      m_framePacer->beginFrame();
+    // Frame-pacer gating happens after UpdateTargetFrameRate() below, so
+    // that begin and the CS-side end read the same m_targetFrameRate value;
+    // gating earlier paired begin-without-end on limiter transitions (R19-6).
 
     try {
       UpdateWindowedRefreshRate();
       UpdateTargetFrameRate(presentInterval);
+
+      // Skip the frame pacer sleep when an explicit frame rate limit is set:
+      // the fps limiter already paces frames, so both sleeping would add up
+      // and push the frame rate below the target (O-14). Also skip unless
+      // LowLatency mode is active: beginFrame state is only consumed by
+      // LowLatency wake prediction.
+      if (m_framePacer && !m_targetFrameRate && m_framePacer->needsGpuSignal())
+        m_framePacer->beginFrame();
+
       PresentImage(presentInterval);
       return D3D_OK;
     } catch (const DxvkError& e) {
@@ -1018,6 +1023,10 @@ namespace dxvk {
         std::forward_as_tuple(m_window),
         std::forward_as_tuple()).first;
 
+      // Seed from the global counter so frameIds stay monotonic across
+      // Invalidate()/device-Reset cycles; the per-entry fence is recreated
+      // with this value, so relative latency waits keep their semantics.
+      entry->second.frameId = ++m_frameIdCounter;
       entry->second.frameLatencySignal = new sync::Fence(entry->second.frameId);
       entry->second.presenter = CreatePresenter(m_window, entry->second.frameLatencySignal);
 

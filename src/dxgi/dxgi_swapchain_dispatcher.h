@@ -20,7 +20,7 @@ namespace dxvk {
       if (likely(m_dispatch != nullptr))
         return m_dispatch->AddRef();
 
-      return 0;
+      return ~0u;
     }
 
     ULONG STDMETHODCALLTYPE Release() {

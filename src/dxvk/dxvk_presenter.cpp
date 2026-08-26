@@ -487,10 +487,10 @@ namespace dxvk {
   void Presenter::setSyncInterval(uint32_t syncInterval) {
     std::lock_guard lock(m_surfaceMutex);
 
-    // Normalize sync interval. With present wait support we
-    // can handle intervals >1 natively via VK_KHR_present_wait.
-    if (!m_hasPresentWait)
-      syncInterval = std::min(syncInterval, 1u);
+    // Normalize sync interval for present modes. We currently
+    // cannot support anything other than 1 natively anyway:
+    // no consumer implements a >1-vblank cadence (R19-2).
+    syncInterval = std::min(syncInterval, 1u);
 
     if (m_preferredSyncInterval != syncInterval) {
       m_preferredSyncInterval = syncInterval;
