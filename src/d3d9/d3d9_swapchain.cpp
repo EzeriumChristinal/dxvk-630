@@ -162,6 +162,25 @@ namespace dxvk {
     UpdatePresentRegion(pSourceRect, pDestRect);
     UpdatePresentParameters();
 
+    if (!SwapWithFrontBuffer() && m_parent->GetOptions()->extraFrontbuffer) {
+      // We never actually rotate in the front buffer.
+      // Just blit to it for GetFrontBufferData.
+
+      // When we have multiple buffers, the last buffer always acts as the front buffer.
+      // (See comment in PresentImage for an explaination why.)
+      // Games with a buffer count of 1 rely on the contents of the previous frame still
+      // being there, so we can't just add another buffer to the rotation.
+      // At the same time, they could call GetFrontBufferData after already rendering to the backbuffer.
+      // So we have to do a copy of the backbuffer that will be copied to the Vulkan backbuffer
+      // and keep that around for the next frame.
+
+      const auto& backbuffer = m_backBuffers[0];
+      const auto& frontbuffer = GetFrontBuffer();
+      if (FAILED(m_parent->StretchRect(backbuffer.ptr(), nullptr, frontbuffer.ptr(), nullptr, D3DTEXF_NONE))) {
+        Logger::err("Failed to blit to front buffer");
+      }
+    }
+
 #ifdef _WIN32
     const bool useGDIFallback = m_partialCopy && !SwapWithFrontBuffer();
     if (useGDIFallback)
@@ -262,15 +281,6 @@ namespace dxvk {
 
     if (unlikely(m_parent->IsDeviceLost())) {
       return D3DERR_DEVICELOST;
-    }
-
-    // Only blit to the extra front buffer after validating the call;
-    // on rejected calls the blit result would be discarded anyway.
-    if (!SwapWithFrontBuffer() && m_parent->GetOptions()->extraFrontbuffer) {
-      const auto& backbuffer = m_backBuffers[0];
-      const auto& frontbuffer = GetFrontBuffer();
-      if (FAILED(m_parent->StretchRect(backbuffer.ptr(), nullptr, frontbuffer.ptr(), nullptr, D3DTEXF_NONE)))
-        Logger::err("Failed to blit to front buffer");
     }
 
     VkExtent3D dstTexExtent = dstTexInfo->GetExtentMip(dst->GetMipLevel());
@@ -889,7 +899,8 @@ namespace dxvk {
         cSync           = sync,
         cFrameId        = m_wctx->frameId,
         cLatency        = m_latencyTracker,
-        cPacer          = m_framePacer
+        cPacer          = m_framePacer,
+        cPaceActive     = !m_targetFrameRate
       ] (DxvkContext* ctx) {
         // Update back buffer color space as necessary
         if (cSrcView->image()->info().colorSpace != cColorSpace) {
@@ -908,7 +919,7 @@ namespace dxvk {
         // Submit command list and present
         ctx->synchronizeWsi(cSync);
 
-        if (cPacer && cPacer->needsGpuSignal()) {
+        if (cPacer && cPaceActive && cPacer->needsGpuSignal()) {
           ctx->signal(cPacer->signal(), cFrameId);
           cPacer->endFrame(cFrameId);
         }

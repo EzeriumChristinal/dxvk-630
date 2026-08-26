@@ -103,10 +103,10 @@ namespace dxvk {
 
 
   void DxvkPipelineCompiler::joinAll() {
-    // join() detaches the thread, so a second pass (e.g. the manager
-    // destructor calling stop() and then the compiler destructor running
-    // again) must not re-join already-joined threads - that would throw
-    // std::system_error and terminate.
+    // join() blocks until the thread exits and marks it unjoinable, so a
+    // second pass (e.g. stop() followed by the compiler destructor running
+    // joinAll again) must not re-join already-joined threads - that would
+    // throw std::system_error and terminate.
     for (dxvk::thread& worker : m_workers) {
       if (worker.joinable())
         worker.join();

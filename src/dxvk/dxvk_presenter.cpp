@@ -1185,11 +1185,13 @@ namespace dxvk {
 
 
   void Presenter::setBufferCount(uint32_t bufferCount) {
+    std::lock_guard lock(m_surfaceMutex);
     m_preferredBufferCount = bufferCount;
   }
 
 
   void Presenter::setAllowTearing(bool allowTearing) {
+    std::lock_guard lock(m_surfaceMutex);
     m_allowTearing = allowTearing;
   }
 
