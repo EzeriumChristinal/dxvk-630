@@ -61,15 +61,18 @@ namespace dxvk {
     }
 
     // Subsequent code must not access any class members
-    // that can be written by setTargetFrameRate
+    // that can be written by setTargetFrameRate. Snapshot the
+    // frame deadline too: a concurrent delay() rewrites m_nextFrame
+    // under the same mutex, so reading it unlocked is a race (R20-3).
+    TimePoint nextFrame = m_nextFrame;
     lock.unlock();
 
-    if (t1 < m_nextFrame)
-      Sleep::sleepUntil(t1, m_nextFrame);
+    if (t1 < nextFrame)
+      Sleep::sleepUntil(t1, nextFrame);
 
     lock.lock();
-    m_nextFrame = (t1 < m_nextFrame + interval)
-      ? m_nextFrame + interval
+    m_nextFrame = (t1 < nextFrame + interval)
+      ? nextFrame + interval
       : t1 + interval;
     lock.unlock();
   }

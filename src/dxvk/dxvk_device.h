@@ -744,6 +744,17 @@ namespace dxvk {
      */
     void waitForIdle();
 
+    /**
+     * \brief Waits for GPU execution only, without draining queues
+     *
+     * Unlike waitForIdle, this does not wait for the submission queues
+     * to drain, so it is safe to call from the queue drainer threads
+     * themselves on error paths (R20-2). Callers must already have
+     * popped the current entry; waiting for queue drain from a drainer
+     * would self-deadlock when siblings are still queued.
+     */
+    void waitForGpuIdle();
+
     void lockPipelineCache();
     void unlockPipelineCache();
     VkPipelineCache getPipelineCache() const;

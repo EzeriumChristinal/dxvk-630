@@ -1,0 +1,25 @@
+flowchart TD
+    D3D8_D3D11_DXGI_frontends["D3D8 D3D11 DXGI frontends"]
+    DxvkInstance["DxvkInstance"]
+    DxvkAdapter_Gen9_detect["DxvkAdapter Gen9 detect"]
+    DxvkDevice["DxvkDevice"]
+    DxvkPipelineManager["DxvkPipelineManager"]
+    DxvkPipeCompiler_dyasync_workers["DxvkPipeCompiler dyasync workers"]
+    DxvkContext["DxvkContext"]
+    DxvkCsThread["DxvkCsThread"]
+    DxvkQueue_submit["DxvkQueue submit"]
+    Vulkan_driver["Vulkan driver"]
+    DxvkQueue_finish["DxvkQueue finish"]
+    Presenter_FramePacer_FpsLimiter["Presenter FramePacer FpsLimiter"]
+    D3D8_D3D11_DXGI_frontends --> DxvkInstance
+    DxvkInstance --> DxvkAdapter_Gen9_detect
+    DxvkAdapter_Gen9_detect --> DxvkDevice
+    DxvkDevice --> DxvkPipelineManager
+    DxvkDevice --> DxvkContext
+    DxvkContext --> DxvkCsThread
+    DxvkCsThread --> DxvkQueue_submit
+    DxvkQueue_submit --> Vulkan_driver
+    DxvkContext --> DxvkPipelineManager
+    DxvkQueue_submit --> DxvkQueue_finish
+    DxvkQueue_finish --> Presenter_FramePacer_FpsLimiter
+    Presenter_FramePacer_FpsLimiter --> Vulkan_driver

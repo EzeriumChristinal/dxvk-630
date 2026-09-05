@@ -16,6 +16,7 @@
 #include "../wsi/wsi_monitor.h"
 
 #include <vector>
+#include <algorithm>
 
 namespace dxvk {
 

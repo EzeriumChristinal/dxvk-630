@@ -4,7 +4,7 @@ DXVK fork tuned for **Intel UHD 630 (Gen9.5)** iGPUs on low-power UMA systems wi
 constrained memory bandwidth.
 
 Built on DXVK v3.0.2 with picks from the Sarek dyasync branch for async pipeline
-compilation and a Gen9 low-power profile. Every change is audited - 16 rounds, every
+compilation and a Gen9 low-power profile. Every change is audited - 20 rounds, every
 finding tracked, 0 critical or high bugs open.
 
 ## Changes from upstream DXVK
@@ -22,7 +22,7 @@ finding tracked, 0 critical or high bugs open.
 | Link-time optimization | Release builds use LTO |
 | Per-type pipeline locks | Compute / graphics pipeline mutex split |
 | D3D9 frame pacer wiring | FramePacer wired into the D3D9 swapchain alongside D3D11 |
-| Audit fixes | Rounds 5-16: UAFs, deadlocks, data races, barrier correctness, overflow guards, memory-policy fixes. |
+| Audit fixes | Rounds 5-20: UAFs, deadlocks, data races, barrier correctness, overflow guards, memory-policy fixes. |
 
 ## Changes from Sarek
 

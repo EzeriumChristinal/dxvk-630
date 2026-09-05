@@ -1,0 +1,20 @@
+sequenceDiagram
+    autonumber
+    participant App as "App"
+    participant D3D11_swapchain as "D3D11 swapchain"
+    participant FramePacer as "FramePacer"
+    participant DxvkContext as "DxvkContext"
+    participant DxvkCsThread as "DxvkCsThread"
+    participant DxvkQueue_submit as "DxvkQueue submit"
+    participant Vulkan_GPU as "Vulkan GPU"
+    participant DxvkQueue_finish as "DxvkQueue finish"
+    participant Presenter as "Presenter"
+    App->>D3D11_swapchain: Present()
+    D3D11_swapchain->>FramePacer: beginFrame()
+    D3D11_swapchain->>DxvkContext: EmitCs present lambda
+    DxvkContext->>DxvkCsThread: execute chunk
+    DxvkCsThread->>FramePacer: endFrame, fence callback
+    DxvkCsThread->>DxvkQueue_submit: dispatch
+    DxvkQueue_submit->>Vulkan_GPU: vkQueueSubmit
+    Vulkan_GPU->>DxvkQueue_finish: fence signals
+    DxvkQueue_finish->>Presenter: signalFrame, fps limit

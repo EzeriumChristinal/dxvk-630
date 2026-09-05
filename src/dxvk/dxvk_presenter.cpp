@@ -1306,8 +1306,11 @@ namespace dxvk {
     if (!sync.fenceSignaled)
       return;
 
+    // Bounded wait like the signal path (R12-2): a wedged WSI fence must
+    // not hang swapchain recreate/teardown forever under m_frameMutex.
+    // On timeout fall through to reset so teardown proceeds (R20-8).
     VkResult vr = m_vkd->vkWaitForFences(m_vkd->device(),
-      1, &sync.fence, VK_TRUE, ~0ull);
+      1, &sync.fence, VK_TRUE, 1'000'000'000ull);
 
     if (vr)
       Logger::err(str::format("Presenter: Failed to wait for WSI fence: ", vr));

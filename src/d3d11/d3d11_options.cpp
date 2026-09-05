@@ -18,7 +18,7 @@ namespace dxvk {
     this->relaxedBarriers       = config.getOption<bool>("d3d11.relaxedBarriers", false);
     this->relaxedGraphicsBarriers = config.getOption<bool>("d3d11.relaxedGraphicsBarriers", false);
     this->maxTessFactor         = std::clamp(config.getOption<int32_t>("d3d11.maxTessFactor", 0), 0, 64);
-    this->samplerAnisotropy     = config.getOption<int32_t>("d3d11.samplerAnisotropy", -1);
+    this->samplerAnisotropy     = std::clamp(config.getOption<int32_t>("d3d11.samplerAnisotropy", -1), -1, 16);
     this->samplerLodBias        = config.getOption<float>("d3d11.samplerLodBias", 0.0f);
     this->clampNegativeLodBias  = config.getOption<bool>("d3d11.clampNegativeLodBias", false);
     this->forceSampleRateShading = config.getOption<bool>("d3d11.forceSampleRateShading", false);

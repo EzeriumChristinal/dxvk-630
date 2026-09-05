@@ -879,6 +879,9 @@ namespace dxvk {
 
       // Bump frame ID
       m_wctx->frameId += 1;
+      // Keep the global seed ahead of every live stream so a recreated
+      // window context never reseeds below in-flight presents (R20-4).
+      m_frameIdCounter = std::max(m_frameIdCounter, m_wctx->frameId);
 
       // Present from CS thread so that we don't
       // have to synchronize with it first.

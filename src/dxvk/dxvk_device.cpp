@@ -22,10 +22,16 @@ namespace dxvk {
         if (options.useRawSsbo == Tristate::Auto)
           options.useRawSsbo = Tristate::False;
         if (options.numDyasyncThreads == 0)
-          options.numDyasyncThreads = std::min<int32_t>(4u,
-            std::thread::hardware_concurrency());
+          options.numDyasyncThreads = std::clamp<int32_t>(
+            std::thread::hardware_concurrency(), 1, 4);
         if (options.maxMemoryBudget == 0u) {
-          VkDeviceSize heapSize = adapter->memoryProperties().memoryHeaps[0].size;
+          // Pick the largest device-local heap, not heap 0 (R20-6).
+          VkDeviceSize heapSize = 0u;
+          const auto& memProps = adapter->memoryProperties();
+          for (uint32_t i = 0u; i < memProps.memoryHeapCount; i++) {
+            if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+              heapSize = std::max(heapSize, memProps.memoryHeaps[i].size);
+          }
           options.maxMemoryBudget = heapSize / 2u;
         }
       }
@@ -734,6 +740,16 @@ namespace dxvk {
 
     m_submissionQueue.unlockDeviceQueue();
   }
+
+
+  void DxvkDevice::waitForGpuIdle() {
+    m_submissionQueue.lockDeviceQueue();
+
+    if (m_vkd->vkDeviceWaitIdle(m_vkd->device()) != VK_SUCCESS)
+      Logger::err("DxvkDevice: waitForGpuIdle: Operation failed");
+
+    m_submissionQueue.unlockDeviceQueue();
+  }
   
   
   DxvkDevicePerfHints DxvkDevice::getPerfHints() {
@@ -962,6 +978,10 @@ namespace dxvk {
   void DxvkDevice::initPipelineCache() {
     VkPipelineCacheCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
 
+    // Hoisted out of the file block: info.pInitialData must stay alive
+    // until vkCreatePipelineCache consumes it (R20-1).
+    std::vector<char> initialData;
+
     // Try to load existing cache from disk
     auto paths = DxvkShaderCache::getDefaultFilePaths();
     if (!paths.directory.empty()) {
@@ -971,10 +991,12 @@ namespace dxvk {
       if (file) {
         size_t dataSize = file.size();
         if (dataSize > 0) {
-          std::vector<char> initialData(dataSize);
+          initialData.resize(dataSize);
           if (file.read(0, dataSize, initialData.data())) {
             info.initialDataSize = dataSize;
             info.pInitialData = initialData.data();
+          } else {
+            initialData.clear();
           }
         }
       }

@@ -222,7 +222,7 @@ namespace dxvk {
       }
 
       if (syncOnError)
-        m_device->waitForIdle();
+        m_device->waitForGpuIdle();
 
       // Good time to invoke allocator tasks now since we
       // expect this to get called somewhat periodically.
@@ -308,7 +308,7 @@ namespace dxvk {
       // Do not wait for the queue to drain while the current entry is
       // still in the queue, otherwise this can never complete.
       if (waitForIdle)
-        m_device->waitForIdle();
+        m_device->waitForGpuIdle();
 
       // Free the command list and associated objects now
       if (entry.submit.cmdList != nullptr) {

@@ -1826,6 +1826,9 @@ namespace dxvk {
   
   
   D3D_FEATURE_LEVEL STDMETHODCALLTYPE D3D11Device::GetFeatureLevel() {
+    // m_featureLevel can be raised under m_featureLevelLock by
+    // CreateDeviceContextState; read it under the same lock (R20-5).
+    std::lock_guard<dxvk::mutex> lock{ m_featureLevelLock };
     return m_featureLevel;
   }
   
