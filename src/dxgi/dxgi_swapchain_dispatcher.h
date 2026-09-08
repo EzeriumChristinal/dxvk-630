@@ -20,6 +20,8 @@ namespace dxvk {
       if (likely(m_dispatch != nullptr))
         return m_dispatch->AddRef();
 
+      // Zombie: nonzero count so callers never delete; Release-null
+      // reports 0 (dead). Inverse of upstream by design, do not "fix".
       return ~0u;
     }
 

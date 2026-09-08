@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <vector>
 #include <mutex>
 
@@ -207,6 +208,12 @@ namespace dxvk {
     // IsCurrent() compares a fresh enumeration against this to detect
     // adapter arrival/removal without querying device properties.
     std::vector<VkPhysicalDevice> m_adapters;
+
+    std::mutex m_isCurrentLock;
+    std::chrono::steady_clock::time_point m_isCurrentTime = { };
+    BOOL m_isCurrentValue = TRUE;
+
+    BOOL checkAdaptersCurrent();
 
     std::atomic<HWND> m_windowAssociation = nullptr;
       

@@ -15,6 +15,7 @@ namespace dxvk {
     constexpr uint32_t DYASYNC_MAX_WORKERS         = 32;
     constexpr uint32_t DYASYNC_MAX_WORKERS_32BIT   = 16;
     constexpr uint32_t DYASYNC_BACKGROUND_INTERVAL = 8;
+    constexpr size_t   DYASYNC_MAX_QUEUED          = 4096;
 
     uint32_t resolve_worker_count(
             uint32_t cpu_cores,
@@ -135,28 +136,49 @@ namespace dxvk {
 
     std::lock_guard<std::mutex> lock(m_mutex);
 
+    // Backpressure: drop the request when flooded with unique states.
+    // Callers ignore the result and fall back to synchronous compile,
+    // so this only bounds memory, never correctness.
+    if (queue.size() >= DYASYNC_MAX_QUEUED)
+      return false;
+
+    bool inserted = false;
     if (entry.pipeline) {
-      if (!m_queuedGraphicsPipelines.insert(
-            QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() }).second)
-        return false;
+      inserted = m_queuedGraphicsPipelines.insert(
+        QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() }).second;
     } else if (entry.computePipeline) {
-      if (!m_queuedComputePipelines.insert(
-            QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() }).second)
-        return false;
+      inserted = m_queuedComputePipelines.insert(
+        QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() }).second;
     }
 
-    // Roll back the dedupe key if the push throws, else a leaked key
-    // would permanently suppress this state's optimized compile.
+    if (!inserted) {
+      // Key hit usually means the identical state is already queued, but
+      // a hash collision would suppress a distinct state's compile
+      // forever. Verify with a full compare; queue anyway on mismatch.
+      for (const auto& queued : queue) {
+        if (entry.pipeline && queued.pipeline == entry.pipeline
+         && queued.state.eq(entry.state))
+          return false;
+        if (entry.computePipeline && queued.computePipeline == entry.computePipeline
+         && queued.computeState.eq(entry.computeState))
+          return false;
+      }
+    }
+
+    // Roll back the dedupe key if the push throws and we inserted it, else
+    // a leaked key would permanently suppress this state's optimized compile.
     // deque::push_back has a strong guarantee: entry is intact on throw.
     try {
       queue.push_back(std::move(entry));
     } catch (...) {
-      if (entry.pipeline)
-        m_queuedGraphicsPipelines.erase(
-          QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() });
-      else if (entry.computePipeline)
-        m_queuedComputePipelines.erase(
-          QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() });
+      if (inserted) {
+        if (entry.pipeline)
+          m_queuedGraphicsPipelines.erase(
+            QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() });
+        else if (entry.computePipeline)
+          m_queuedComputePipelines.erase(
+            QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() });
+      }
       throw;
     }
 

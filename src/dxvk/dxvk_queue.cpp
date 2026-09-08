@@ -256,7 +256,7 @@ namespace dxvk {
       DxvkSubmitEntry entry = std::move(m_finishQueue.front());
       lock.unlock();
 
-      bool waitForIdle = false;
+      bool needsGpuSync = false;
 
       if (entry.submit.cmdList != nullptr) {
         VkResult status = m_lastError.load();
@@ -284,7 +284,7 @@ namespace dxvk {
 
         if (status != VK_SUCCESS) {
           m_lastError = status;
-          waitForIdle = status != VK_ERROR_DEVICE_LOST;
+          needsGpuSync = status != VK_ERROR_DEVICE_LOST;
         }
       } else if (entry.present.presenter != nullptr) {
         // Signal the frame and then immediately destroy the reference.
@@ -307,7 +307,7 @@ namespace dxvk {
 
       // Do not wait for the queue to drain while the current entry is
       // still in the queue, otherwise this can never complete.
-      if (waitForIdle)
+      if (needsGpuSync)
         m_device->waitForGpuIdle();
 
       // Free the command list and associated objects now

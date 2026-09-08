@@ -89,13 +89,17 @@ namespace dxvk {
   
   void DxvkCsChunkPool::freeChunk(DxvkCsChunk* chunk) {
     chunk->reset();
-    
-    std::lock_guard<dxvk::mutex> lock(m_mutex);
-    
-    if (m_chunks.size() < MaxCachedChunks)
-      m_chunks.push_back(chunk);
-    else
-      delete chunk;
+
+    { std::lock_guard<dxvk::mutex> lock(m_mutex);
+
+      if (m_chunks.size() < MaxCachedChunks) {
+        m_chunks.push_back(chunk);
+        return;
+      }
+    }
+
+    // Free past the lock; the chunk is already detached.
+    delete chunk;
   }
   
   

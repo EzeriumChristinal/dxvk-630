@@ -446,6 +446,27 @@ namespace dxvk {
 
 
   BOOL STDMETHODCALLTYPE DxgiFactory::IsCurrent() {
+    // Some engines poll this per frame; throttle the full enumeration.
+    // A change surfaces on the next poll after the window, which is fine:
+    // the caller just re-enumerates adapters when we return FALSE.
+    constexpr auto IsCurrentCacheWindow = std::chrono::milliseconds(500);
+
+    { std::lock_guard<std::mutex> cacheLock(m_isCurrentLock);
+      if (m_isCurrentTime != std::chrono::steady_clock::time_point()
+       && std::chrono::steady_clock::now() - m_isCurrentTime < IsCurrentCacheWindow)
+        return m_isCurrentValue; }
+
+    BOOL result = this->checkAdaptersCurrent();
+
+    { std::lock_guard<std::mutex> cacheLock(m_isCurrentLock);
+      m_isCurrentTime = std::chrono::steady_clock::now();
+      m_isCurrentValue = result; }
+
+    return result;
+  }
+
+
+  BOOL DxgiFactory::checkAdaptersCurrent() {
     auto vki = m_instance->vki();
     uint32_t numAdapters = 0;
     if (vki->vkEnumeratePhysicalDevices(vki->instance(), &numAdapters, nullptr) != VK_SUCCESS)

@@ -388,6 +388,8 @@ namespace dxvk {
     auto dstPtr = reinterpret_cast<      int*>(args.boolBuffer) + range.dstIndex;
     auto srcPtr = reinterpret_cast<const int*>(args.constBoolApi) + range.srcIndex;
 
+    // Tail overrun (<=3 u32) lands in alignment padding: the bool block
+    // is last and sized to the aligned staticSize (d3d9_device.cpp).
     for (uint32_t i = 0u; i < count; i += 4u) {
       auto data = _mm_loadu_si128(reinterpret_cast<const __m128i*>(srcPtr + i));
       _mm_stream_si128(reinterpret_cast<__m128i*>(dstPtr + i), data);

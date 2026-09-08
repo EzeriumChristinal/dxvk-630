@@ -1344,11 +1344,11 @@ namespace dxvk {
     if (!featureLevel)
       return E_INVALIDARG;
 
-    if (m_featureLevel < featureLevel) {
+    if (m_featureLevel.load(std::memory_order_acquire) < featureLevel) {
       std::lock_guard<dxvk::mutex> lock{ m_featureLevelLock };
-      if (m_featureLevel < featureLevel) {
-        m_featureLevel = featureLevel;
-        m_deviceFeatures = D3D11DeviceFeatures(*m_dxvkDevice, m_d3d11Options, m_featureLevel);
+      if (m_featureLevel.load(std::memory_order_relaxed) < featureLevel) {
+        m_featureLevel.store(featureLevel, std::memory_order_release);
+        m_deviceFeatures = D3D11DeviceFeatures(*m_dxvkDevice, m_d3d11Options, featureLevel);
       }
     }
 
@@ -1826,10 +1826,9 @@ namespace dxvk {
   
   
   D3D_FEATURE_LEVEL STDMETHODCALLTYPE D3D11Device::GetFeatureLevel() {
-    // m_featureLevel can be raised under m_featureLevelLock by
-    // CreateDeviceContextState; read it under the same lock (R20-5).
-    std::lock_guard<dxvk::mutex> lock{ m_featureLevelLock };
-    return m_featureLevel;
+    // Raised at most once under m_featureLevelLock; atomic read needs
+    // no lock (lock-free hot path, R20-5 race stays fixed).
+    return m_featureLevel.load(std::memory_order_acquire);
   }
   
   

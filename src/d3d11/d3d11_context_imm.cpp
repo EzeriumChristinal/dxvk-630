@@ -389,6 +389,8 @@ namespace dxvk {
         // executed, so that the hasRw/hasWoAccess reads below are accurate
         // and the invalidate-preserve promotion stays available when a
         // queued read would otherwise force a full GPU wait later.
+        // Immediate contexts are single-threaded by D3D11 contract, so no
+        // other thread can dispatch between this check and the use below.
         bool csIdle = m_csThread.lastSequenceNumber() >= sequenceNumber;
 
         if (!csIdle || buffer->isInUse(DxvkAccess::Write) || buffer->isInUse(DxvkAccess::Read))
