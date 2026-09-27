@@ -1690,6 +1690,11 @@ namespace dxvk {
     while (pos < value.size() && value[pos] >= '0' && value[pos] <= '9')
       pos += 1;
 
+    // The bounded fractional loop above stops early on long inputs, so it no
+    // longer validates the tail on its own; reject any trailing garbage.
+    if (pos != value.size())
+      return false;
+
     // Compute final number, not super accurate but this should do
     result = float((double(fractPart) / double(fractDivisor)) + double(intPart));
 

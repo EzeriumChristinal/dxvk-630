@@ -1104,17 +1104,29 @@ namespace dxvk {
     instance = this->findInstance(state);
 
     if (!instance) {
+      // Evaluate once: the fast path and the fall-through below need the
+      // same answer, and the check walks the input layout attributes.
+      bool canCreateBasePipeline = this->canCreateBasePipeline(state);
+
       // dyasync fast path: return placeholder if available. Only states
       // that can be linked from base libraries without shader patching
       // are eligible, and the instance is cached immediately so that
       // subsequent draws find it instead of re-entering this slow path.
-      if (m_compiler && this->canCreateBasePipeline(state)) {
+      if (m_compiler && canCreateBasePipeline) {
         VkPipeline fallback = this->getBasePipeline(state);
         if (fallback != VK_NULL_HANDLE) {
           instance = this->createInstance(state, true);
           lock.unlock();
-          m_compiler->queueCompilation(this, state,
-            DxvkPipelinePriority::High);
+
+          // If the async queue is saturated (or the key collided) the
+          // optimized variant is never scheduled, and the cached base-only
+          // instance means later draws never reach the slow path below.
+          // Fall back to the normal worker so a drop cannot pin this state
+          // to the base pipeline forever.
+          if (!m_compiler->queueCompilation(this, state,
+                DxvkPipelinePriority::High))
+            m_workers->compileGraphicsPipeline(this, state, DxvkPipelinePriority::Low);
+
           return DxvkGraphicsPipelineHandle { fallback,
             DxvkGraphicsPipelineType::BasePipeline,
             computeAttachmentMask(state) };
@@ -1123,7 +1135,6 @@ namespace dxvk {
 
       // Keep pipeline object locked, at worst we're going to stall
       // a state cache worker and the current thread needs priority.
-      bool canCreateBasePipeline = this->canCreateBasePipeline(state);
       instance = this->createInstance(state, canCreateBasePipeline);
 
       // Unlock here since we may dispatch the pipeline to a worker,

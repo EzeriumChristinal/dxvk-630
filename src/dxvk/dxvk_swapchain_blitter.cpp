@@ -98,7 +98,15 @@ namespace dxvk {
     attachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
-    if (srcRect.extent != dstRect.extent)
+    // A clear is only needed when the blit does not cover the whole image.
+    // When dstRect spans the full extent the draw overwrites every pixel,
+    // so loading is redundant even if the source is scaled; clearing there
+    // wrote the entire swap chain image every present for nothing.
+    bool coversFullImage = dstRect.offset.x == 0 && dstRect.offset.y == 0
+                        && dstRect.extent.width  == dstExtent.width
+                        && dstRect.extent.height == dstExtent.height;
+
+    if (!coversFullImage && srcRect.extent != dstRect.extent)
       attachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 
     VkRenderingInfo renderInfo = { VK_STRUCTURE_TYPE_RENDERING_INFO };

@@ -59,7 +59,7 @@ namespace dxvk {
     // inherently synchronous: the pipeline handle must exist before the
     // draw can be recorded, and there is no placeholder mechanism for
     // compute. Do NOT queue this to the async compiler - createInstance()
-    // already created the pipeline above, so a queued job would find the
+    // below already creates the pipeline, so a queued job would find the
     // instance and bail, wasting a queue slot and a worker wakeup per
     // unique spec-constant state.
     {

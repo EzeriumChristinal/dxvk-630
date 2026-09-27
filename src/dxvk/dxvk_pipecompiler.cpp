@@ -23,7 +23,7 @@ namespace dxvk {
             bool     is_32bit,
             bool     use_all_cores) {
       if (use_all_cores)
-        return cpu_cores;
+        return std::clamp(cpu_cores, DYASYNC_MIN_WORKERS, DYASYNC_MAX_WORKERS);
 
       if (config_thread_count > 0)
         return uint32_t(config_thread_count);
@@ -134,54 +134,59 @@ namespace dxvk {
   bool DxvkPipelineCompiler::pushEntry(DxvkPipelineEntry&& entry) {
     std::deque<DxvkPipelineEntry>& queue = this->laneFor(entry.priority);
 
-    std::lock_guard<std::mutex> lock(m_mutex);
+    {
+      std::lock_guard<std::mutex> lock(m_mutex);
 
-    // Backpressure: drop the request when flooded with unique states.
-    // Callers ignore the result and fall back to synchronous compile,
-    // so this only bounds memory, never correctness.
-    if (queue.size() >= DYASYNC_MAX_QUEUED)
-      return false;
+      // Backpressure: drop the request when flooded with unique states.
+      // Callers fall back to the normal pipeline worker path, so this only
+      // bounds memory, never correctness.
+      if (queue.size() >= DYASYNC_MAX_QUEUED)
+        return false;
 
-    bool inserted = false;
-    if (entry.pipeline) {
-      inserted = m_queuedGraphicsPipelines.insert(
-        QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() }).second;
-    } else if (entry.computePipeline) {
-      inserted = m_queuedComputePipelines.insert(
-        QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() }).second;
-    }
+      bool inserted = false;
+      if (entry.pipeline) {
+        inserted = m_queuedGraphicsPipelines.insert(
+          QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() }).second;
+      } else if (entry.computePipeline) {
+        inserted = m_queuedComputePipelines.insert(
+          QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() }).second;
+      }
 
-    if (!inserted) {
-      // Key hit usually means the identical state is already queued, but
-      // a hash collision would suppress a distinct state's compile
-      // forever. Verify with a full compare; queue anyway on mismatch.
-      for (const auto& queued : queue) {
-        if (entry.pipeline && queued.pipeline == entry.pipeline
-         && queued.state.eq(entry.state))
-          return false;
-        if (entry.computePipeline && queued.computePipeline == entry.computePipeline
-         && queued.computeState.eq(entry.computeState))
-          return false;
+      if (!inserted) {
+        // Key hit usually means the identical state is already queued, but
+        // a hash collision would suppress a distinct state's compile
+        // forever. Verify with a full compare; queue anyway on mismatch.
+        for (const auto& queued : queue) {
+          if (entry.pipeline && queued.pipeline == entry.pipeline
+           && queued.state.eq(entry.state))
+            return false;
+          if (entry.computePipeline && queued.computePipeline == entry.computePipeline
+           && queued.computeState.eq(entry.computeState))
+            return false;
+        }
+      }
+
+      // Roll back the dedupe key if the push throws and we inserted it, else
+      // a leaked key would permanently suppress this state's optimized compile.
+      // deque::push_back has a strong guarantee: entry is intact on throw.
+      try {
+        queue.push_back(std::move(entry));
+      } catch (...) {
+        if (inserted) {
+          if (entry.pipeline)
+            m_queuedGraphicsPipelines.erase(
+              QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() });
+          else if (entry.computePipeline)
+            m_queuedComputePipelines.erase(
+              QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() });
+        }
+        throw;
       }
     }
 
-    // Roll back the dedupe key if the push throws and we inserted it, else
-    // a leaked key would permanently suppress this state's optimized compile.
-    // deque::push_back has a strong guarantee: entry is intact on throw.
-    try {
-      queue.push_back(std::move(entry));
-    } catch (...) {
-      if (inserted) {
-        if (entry.pipeline)
-          m_queuedGraphicsPipelines.erase(
-            QueueKey<DxvkGraphicsPipeline> { entry.pipeline, entry.state.hash() });
-        else if (entry.computePipeline)
-          m_queuedComputePipelines.erase(
-            QueueKey<DxvkComputePipeline> { entry.computePipeline, entry.computeState.hash() });
-      }
-      throw;
-    }
-
+    // Notify after releasing m_mutex so the worker that gets woken does not
+    // immediately block on the lock the notifier still holds (baseline and
+    // Sarek order it this way).
     m_cond.notify_one();
     return true;
   }

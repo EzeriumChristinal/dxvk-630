@@ -10,10 +10,10 @@ branch and a Gen9 low-power profile.
 
 | Change | Description |
 |--------|-------------|
-| Gen9 low-power profile | Auto-detects UHD 630-class hardware, caps memory budget at half the largest heap, disables raw SSBO, enables async compilation. `dxvk.conf` values override the built-in defaults |
+| Gen9 low-power profile | Auto-detects UHD 630-class hardware, sets the memory budget to half the largest DEVICE_LOCAL heap, enables async compilation, clamps dyasync threads to 1..4. `dxvk.conf` values override the built-in defaults |
 | Dyasync pipeline compilation | Background threads compile pipelines off the hot path, hiding compile stutter on slow iGPUs. `dxvk.enableDyasync`, `dxvk.numDyasyncThreads` |
 | Frame pacer | Three modes: max-frame-latency, low-latency (predictive wake), min-latency. `dxvk.framePace` or `DXVK_FRAME_PACE`, `dxvk.lowLatencyOffset` fine-tuning |
-| Narrowed pipeline barriers | Stage-specific masks replace `ALL_COMMANDS_BIT` on transfer-only paths; relaxed barriers available |
+| Narrowed pipeline barriers | Transfer/SDMA paths drop to transfer-only stage masks; everything with an external consumer stays `ALL_COMMANDS_BIT`. `d3d11.relaxedBarriers` available |
 | Pipeline cache persistence | Cache saved to disk at exit, reused across runs |
 | ALLOW_TEARING / forceHdr | Immediate present mode for the DXGI flip model; forced HDR10 option |
 | Link-time optimization | Release builds use LTO |

@@ -924,8 +924,15 @@ namespace dxvk {
        * optional lets device creation succeed and then breaks every
        * discard-containing shader on drivers without the feature. */
       ENABLE_FEATURE(vk13, shaderDemoteToHelperInvocation, true),
-      /* Optional is safe: the compiler never emits workgroup init ops. */
-      ENABLE_FEATURE(vk13, shaderZeroInitializeWorkgroupMemory, false),
+      /* Must stay required: SpirvBuilder::emitDclLds (dxbc-spirv
+       * spirv_builder.cpp) declares every groupshared/LDS variable as a
+       * Workgroup OpVariable with an OpConstantNull initializer. A null
+       * constant initializer on Workgroup storage is exactly what
+       * VK_KHR_zero_initialize_workgroup_memory permits; without the feature
+       * that module is invalid. Upstream DXVK requires it too, so keeping it
+       * optional lets device creation succeed and then breaks every shader
+       * that uses groupshared memory. */
+      ENABLE_FEATURE(vk13, shaderZeroInitializeWorkgroupMemory, true),
       ENABLE_FEATURE(vk13, subgroupSizeControl, false),
       ENABLE_FEATURE(vk13, synchronization2, true),
 
