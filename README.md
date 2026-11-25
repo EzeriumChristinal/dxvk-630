@@ -1,10 +1,63 @@
 # dxvk-630
 
-DXVK fork for Intel UHD 630 (Gen9.5) iGPUs on low-power UMA systems with
-constrained memory bandwidth.
+DXVK fork for Intel UHD 630 (Gen9.5) iGPUs on low-power UMA systems with constrained memory bandwidth. Built on DXVK v3.0.2 with async pipeline compilation from Sarek dyasync and a Gen9 low-power profile.
 
-Built on DXVK v3.0.2 with async pipeline compilation from Sarek dyasync
-and a Gen9 low-power profile.
+## Architecture
+
+```mermaid
+flowchart TD
+    D3D8_D3D11_DXGI_frontends["D3D8 D3D11 DXGI frontends"]
+    DxvkInstance["DxvkInstance"]
+    DxvkAdapter_Gen9_detect["DxvkAdapter Gen9 detect"]
+    DxvkDevice["DxvkDevice"]
+    DxvkPipelineManager["DxvkPipelineManager"]
+    DxvkPipeCompiler_dyasync_workers["DxvkPipeCompiler dyasync workers"]
+    DxvkContext["DxvkContext"]
+    DxvkCsThread["DxvkCsThread"]
+    DxvkQueue_submit["DxvkQueue submit"]
+    Vulkan_driver["Vulkan driver"]
+    DxvkQueue_finish["DxvkQueue finish"]
+    Presenter_FramePacer_FpsLimiter["Presenter FramePacer FpsLimiter"]
+    D3D8_D3D11_DXGI_frontends --> DxvkInstance
+    DxvkInstance --> DxvkAdapter_Gen9_detect
+    DxvkAdapter_Gen9_detect --> DxvkDevice
+    DxvkDevice --> DxvkPipelineManager
+    DxvkDevice --> DxvkContext
+    DxvkContext --> DxvkCsThread
+    DxvkCsThread --> DxvkQueue_submit
+    DxvkQueue_submit --> Vulkan_driver
+    DxvkContext --> DxvkPipelineManager
+    DxvkQueue_submit --> DxvkQueue_finish
+    DxvkQueue_finish --> Presenter_FramePacer_FpsLimiter
+    Presenter_FramePacer_FpsLimiter --> Vulkan_driver
+```
+
+Present lifecycle:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as "App"
+    participant D3D11_swapchain as "D3D11 swapchain"
+    participant FramePacer as "FramePacer"
+    participant DxvkContext as "DxvkContext"
+    participant DxvkCsThread as "DxvkCsThread"
+    participant DxvkQueue_submit as "DxvkQueue submit"
+    participant Vulkan_GPU as "Vulkan GPU"
+    participant DxvkQueue_finish as "DxvkQueue finish"
+    participant Presenter as "Presenter"
+    App->>D3D11_swapchain: Present()
+    D3D11_swapchain->>FramePacer: beginFrame()
+    D3D11_swapchain->>DxvkContext: EmitCs present lambda
+    DxvkContext->>DxvkCsThread: execute chunk
+    DxvkCsThread->>FramePacer: endFrame, fence callback
+    DxvkCsThread->>DxvkQueue_submit: dispatch
+    DxvkQueue_submit->>Vulkan_GPU: vkQueueSubmit
+    Vulkan_GPU->>DxvkQueue_finish: fence signals
+    DxvkQueue_finish->>Presenter: signalFrame, fps limit
+```
+
+Diagrams render inline on GitHub via Mermaid ([GitHub docs](https://github.blog/developer-skills/github/include-diagrams-markdown-files-mermaid/)). Editable source: `docs/architecture.mmd`, `docs/architecture-frame.mmd`.
 
 ## Changes from upstream DXVK
 
@@ -21,9 +74,7 @@ and a Gen9 low-power profile.
 
 ## Changes from Sarek
 
-Sarek contributed dyasync and Gen9 detection. Targets UHD 630 only:
-no multi-vendor GPU profiles, simplified profile resolution, reworked frame pacer
-with three latency modes.
+Sarek contributed dyasync and Gen9 detection. Targets UHD 630 only: no multi-vendor GPU profiles, simplified profile resolution, reworked frame pacer with three latency modes.
 
 ## Building
 
@@ -39,8 +90,7 @@ Cross-compiles to `x86_64-w64-mingw32` from Linux or Windows.
 
 ## Configuration
 
-Shipped `dxvk.conf` sets the defaults. Put it next to `dxvk.dll`, point
-`DXVK_CONFIG_FILE` at it, or drop a per-game `dxvk.conf` in the game dir. Fork keys:
+Shipped `dxvk.conf` sets the defaults. Put it next to `dxvk.dll`, point `DXVK_CONFIG_FILE` at it, or drop a per-game `dxvk.conf` in the game dir. Fork keys:
 `dxvk.enableDyasync` (auto/on/off), `dxvk.numDyasyncThreads` (0 = auto),
 `dxvk.framePace` (empty / low-latency / min-latency), `dxvk.lowLatencyOffset`
 (microseconds, -10000..10000), `dxvk.maxMemoryBudget` (bytes; Gen9 auto = heap / 2).
