@@ -57,7 +57,7 @@ sequenceDiagram
     DxvkQueue_finish->>Presenter: signalFrame, fps limit
 ```
 
-Diagrams render inline on GitHub via Mermaid ([GitHub docs](https://github.blog/developer-skills/github/include-diagrams-markdown-files-mermaid/)). Editable source: `docs/architecture.mmd`, `docs/architecture-frame.mmd`.
+The first diagram is the system architecture: D3D8/D3D9/D3D11/DXGI frontends feed DxvkInstance, which detects Gen9, creates DxvkDevice, which owns DxvkPipelineManager, DxvkContext, DxvkCsThread, and DxvkQueue submitting to the Vulkan driver, with Presenter/FramePacer/FpsLimiter pacing presents back to the driver. The second is the present lifecycle: App calls Present() on the D3D11 swapchain, which begins the frame pacer, emits a CS present lambda to DxvkContext, executes the chunk on DxvkCsThread, ends the frame with a fence callback, dispatches to DxvkQueue for vkQueueSubmit, the GPU fence signals DxvkQueue finish, which calls Presenter signalFrame and fps limit. Editable source: `docs/architecture.mmd`, `docs/architecture-frame.mmd`.
 
 ## Changes from upstream DXVK
 
