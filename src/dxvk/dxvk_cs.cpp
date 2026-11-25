@@ -118,7 +118,8 @@ namespace dxvk {
     }
     
     m_condOnAdd.notify_one();
-    m_thread.join();
+    if (m_thread.joinable())
+      m_thread.join();
   }
   
   
@@ -262,7 +263,11 @@ namespace dxvk {
             auto& counter = isHighPrio ? m_seqHighPrio : m_seqOrdered;
             counter.store(entry.seq);
 
-            m_condOnSync.notify_one();
+            // Multiple threads may wait on this CV with different predicates
+            // (injectChunk timelines vs synchronize sequences, on either
+            // counter), so a single wakeup can be consumed by a waiter whose
+            // predicate is still false and leave another one asleep forever.
+            m_condOnSync.notify_all();
           }
 
           // Immediately free the chunk to release

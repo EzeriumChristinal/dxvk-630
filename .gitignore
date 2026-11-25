@@ -1,6 +1,7 @@
 build/
 build-debug/
 build-release/
+build-release-32/
 build-msvc-x86/
 build-msvc-x64/
 dxvk-venv/

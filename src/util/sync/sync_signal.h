@@ -147,7 +147,9 @@ namespace dxvk::sync {
     }
 
     void signal(uint64_t value) {
-      std::vector<std::function<void ()>> toFire;
+      // Staging list so callbacks fire outside the lock. splice() moves the
+      // existing nodes, so this stays allocation-free on the per-frame path.
+      std::list<std::pair<uint64_t, std::function<void ()>>> toFire;
 
       {
         std::unique_lock<dxvk::mutex> lock(m_mutex);
@@ -156,8 +158,7 @@ namespace dxvk::sync {
 
         for (auto i = m_callbacks.begin(); i != m_callbacks.end(); ) {
           if (value >= i->first) {
-            toFire.push_back(std::move(i->second));
-            i = m_callbacks.erase(i);
+            toFire.splice(toFire.end(), m_callbacks, i++);
           } else {
             i++;
           }
@@ -165,7 +166,7 @@ namespace dxvk::sync {
       }
 
       for (auto& cb : toFire)
-        cb();
+        cb.second();
     }
 
     void wait(uint64_t value) {

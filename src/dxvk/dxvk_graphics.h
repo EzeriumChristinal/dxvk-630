@@ -652,7 +652,8 @@ namespace dxvk {
 
     DxvkGraphicsPipelineInstance* createInstance(
       const DxvkGraphicsPipelineStateInfo& state,
-            bool                           doCreateBasePipeline);
+            bool                           doCreateBasePipeline,
+            VkPipeline                     baseHandle = VK_NULL_HANDLE);
     
     DxvkGraphicsPipelineInstance* findInstance(
       const DxvkGraphicsPipelineStateInfo& state);

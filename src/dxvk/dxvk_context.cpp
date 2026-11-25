@@ -3941,7 +3941,10 @@ namespace dxvk {
     DxvkImageUsageInfo imageUsage = { };
     imageUsage.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
-    ensureImageCompatibility(image, imageUsage);
+    if (!ensureImageCompatibility(image, imageUsage)) {
+      Logger::err("DxvkContext: copyImageToBufferCs: Failed to make image shader-readable.");
+      return;
+    }
 
     if (unlikely(m_features.test(DxvkContextFeature::DebugUtils))) {
       const char* dstName = buffer->info().debugName;
@@ -7620,7 +7623,7 @@ namespace dxvk {
       auto& entry = m_deferredClears[srcIndex];
 
       if ((entry.imageView->image() == &image)
-       && ((entry.clearAspects | entry.discardAspects) | subresources.aspectMask)
+       && ((entry.clearAspects | entry.discardAspects) & subresources.aspectMask)
        && (vk::checkSubresourceRangeOverlap(entry.imageView->imageSubresources(), subresources))) {
         clearBatch.add(batchClear(entry.imageView, -1, entry.discardAspects, entry.clearAspects, entry.clearValue));
         srcIndex += 1u;
@@ -7664,7 +7667,7 @@ namespace dxvk {
     const VkImageSubresourceRange& subresources) {
     for (auto& entry : m_deferredClears) {
       if ((entry.imageView->image() == &image)
-       && ((entry.clearAspects | entry.discardAspects) | subresources.aspectMask)
+       && ((entry.clearAspects | entry.discardAspects) & subresources.aspectMask)
        && (vk::checkSubresourceRangeOverlap(entry.imageView->imageSubresources(), subresources)))
         return &entry;
     }
@@ -9625,15 +9628,18 @@ namespace dxvk {
 
 
   void DxvkContext::prepareSharedImages() {
-    // Only flush clears for shared images, and restore layouts
-    bool hasSharedClear = false;
+    small_vector<Rc<DxvkImage>, 8u> imagesToClear;
 
-    for (const auto& image : m_nonDefaultLayoutImages) {
-      if (image->info().shared)
-        hasSharedClear = flushDeferredClear(*image, image->getAvailableSubresources());
+    // Only flush clears for shared images, and restore layouts
+    for (const auto& clear : m_deferredClears) {
+      if (clear.imageView->image()->info().shared)
+        imagesToClear.push_back(clear.imageView->image());
     }
 
-    if (hasSharedClear)
+    for (const auto& image : imagesToClear)
+      flushDeferredClear(*image, image->getAvailableSubresources());
+
+    if (!imagesToClear.empty())
       flushBarriers();
 
     restoreImageLayouts([] (DxvkImage& image) {

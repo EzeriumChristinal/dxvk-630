@@ -1337,9 +1337,16 @@ namespace dxvk {
       if (unlikely(srcCopyExtent.width != srcExtent.width || srcCopyExtent.height != srcExtent.height))
         return D3DERR_INVALIDCALL;
 
+      if (unlikely(dstCopyExtent.width != dstExtent.width || dstCopyExtent.height != dstExtent.height))
+        return D3DERR_INVALIDCALL;
+
       if (unlikely(m_inScene))
         return D3DERR_INVALIDCALL;
     }
+
+    if (unlikely(srcCopyExtent.width == 0 || srcCopyExtent.height == 0
+      || dstCopyExtent.width == 0 || dstCopyExtent.height == 0))
+      return D3D_OK;
 
     // Copies would only work if the extents match. (ie. no stretching)
     bool stretch = srcCopyExtent != dstCopyExtent;
@@ -4830,11 +4837,10 @@ namespace dxvk {
       // Perform submission. If the amount of staging memory allocated since the
       // last submission exceeds the hard limit, we need to submit to guarantee
       // forward progress. Ideally, this should not happen very often.
-      GpuFlushType flushType = stagingBufferAllocated <= m_stagingMemorySignaled + MaxMemoryInFlight
-        ? GpuFlushType::ImplicitSynchronization
-        : GpuFlushType::ExplicitFlush;
-
-      ConsiderFlush(flushType);
+      if (stagingBufferAllocated <= m_stagingMemorySignaled + MaxMemoryInFlight)
+        ConsiderFlush(GpuFlushType::ImplicitSynchronization);
+      else
+        ExecuteFlush(false);
     }
 
     // Wait for staging memory to get recycled.
@@ -7224,15 +7230,14 @@ namespace dxvk {
 
       key.setDepthCompare(cIsDepth, VK_COMPARE_OP_LESS_OR_EQUAL);
 
-      if (cState.mipFilter) {
-        uint32_t anisotropy = cState.maxAnisotropy;
+      if (!cIsMultiMip) {
+        // For some reason, using the 0.0 - 0.0 range breaks linear filtering in some cases
+        key.setLodRange(0.0f, 1.0f, 0.0f);
+      } else if (cState.mipFilter) {
+        uint32_t anisotropy = cState.minFilter == D3DTEXF_ANISOTROPIC
+          ? cState.maxAnisotropy : 0u;
 
-        // Anisotropic filtering doesn't make any sense with only one mip
-        if (cState.minFilter != D3DTEXF_ANISOTROPIC || !cIsMultiMip)
-          anisotropy = 0u;
-
-        // Forcing anisotropic filtering doesn't make any sense with only one mip
-        if (m_d3d9Options.samplerAnisotropy != -1 && cIsMultiMip && cState.minFilter > D3DTEXF_POINT)
+        if (m_d3d9Options.samplerAnisotropy != -1 && cState.minFilter > D3DTEXF_POINT)
           anisotropy = m_d3d9Options.samplerAnisotropy;
 
         key.setAniso(anisotropy);

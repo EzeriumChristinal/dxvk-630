@@ -1115,7 +1115,13 @@ namespace dxvk {
       if (m_compiler && canCreateBasePipeline) {
         VkPipeline fallback = this->getBasePipeline(state);
         if (fallback != VK_NULL_HANDLE) {
-          instance = this->createInstance(state, true);
+          instance = this->createInstance(state, true, fallback);
+
+          // A valid base handle was passed in and no optimized handle exists
+          // yet, so this is exactly {fallback, BasePipeline, attachments} -
+          // the attachment mask createInstance already computed. Capture it
+          // before queueing so the type cannot race with a worker.
+          DxvkGraphicsPipelineHandle handle = instance->getHandle();
           lock.unlock();
 
           // If the async queue is saturated (or the key collided) the
@@ -1127,9 +1133,7 @@ namespace dxvk {
                 DxvkPipelinePriority::High))
             m_workers->compileGraphicsPipeline(this, state, DxvkPipelinePriority::Low);
 
-          return DxvkGraphicsPipelineHandle { fallback,
-            DxvkGraphicsPipelineType::BasePipeline,
-            computeAttachmentMask(state) };
+          return handle;
         }
       }
 
@@ -1233,11 +1237,13 @@ namespace dxvk {
 
   DxvkGraphicsPipelineInstance* DxvkGraphicsPipeline::createInstance(
     const DxvkGraphicsPipelineStateInfo& state,
-          bool                           doCreateBasePipeline) {
-    VkPipeline baseHandle = VK_NULL_HANDLE;
+          bool                           doCreateBasePipeline,
+          VkPipeline                     baseHandle) {
     VkPipeline fastHandle = VK_NULL_HANDLE;
 
-    if (doCreateBasePipeline)
+    // The dyasync fast path already resolved the base pipeline for this
+    // state, so only look it up here when it was not handed in.
+    if (doCreateBasePipeline && !baseHandle)
       baseHandle = this->getBasePipeline(state);
 
     // Fast-linking may fail in some situations
