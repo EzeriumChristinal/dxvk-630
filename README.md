@@ -1,6 +1,6 @@
 # dxvk-630
 
-DXVK fork for Intel UHD 630 (Gen9.5) iGPUs on low-power UMA systems with constrained memory bandwidth. Built on DXVK v3.0.2 with async pipeline compilation from Sarek dyasync and a Gen9 low-power profile.
+DXVK fork for Intel UHD 630 (Gen9.5) iGPUs on low-power UMA systems with constrained memory bandwidth. Built on DXVK v3.0.2, with async pipeline compilation from Sarek dyasync (v1.12.0) and a Gen9 low-power profile.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ flowchart TD
     Presenter_FramePacer_FpsLimiter --> Vulkan_driver
 ```
 
-Present lifecycle:
+Flow: D3D8/D3D9/D3D11/DXGI frontends feed DxvkInstance, which detects Gen9 hardware and creates DxvkDevice. The device owns DxvkPipelineManager (with dyasync worker threads), DxvkContext, DxvkCsThread, and DxvkQueue, which submits command buffers to the Vulkan driver. Presents flow back through Presenter, FramePacer, and FpsLimiter. Editable source: `docs/architecture.mmd`.
 
 ```mermaid
 sequenceDiagram
@@ -57,7 +57,7 @@ sequenceDiagram
     DxvkQueue_finish->>Presenter: signalFrame, fps limit
 ```
 
-The first diagram is the system architecture: D3D8/D3D9/D3D11/DXGI frontends feed DxvkInstance, which detects Gen9, creates DxvkDevice, which owns DxvkPipelineManager, DxvkContext, DxvkCsThread, and DxvkQueue submitting to the Vulkan driver, with Presenter/FramePacer/FpsLimiter pacing presents back to the driver. The second is the present lifecycle: App calls Present() on the D3D11 swapchain, which begins the frame pacer, emits a CS present lambda to DxvkContext, executes the chunk on DxvkCsThread, ends the frame with a fence callback, dispatches to DxvkQueue for vkQueueSubmit, the GPU fence signals DxvkQueue finish, which calls Presenter signalFrame and fps limit. Editable source: `docs/architecture.mmd`, `docs/architecture-frame.mmd`.
+Flow: App calls Present() on the D3D11 swapchain, which begins the frame pacer, emits a CS present lambda to DxvkContext, executes the chunk on DxvkCsThread, ends the frame with a fence callback, dispatches to DxvkQueue for vkQueueSubmit. The GPU fence signals DxvkQueue finish, which calls Presenter signalFrame and fps limit. Editable source: `docs/architecture-frame.mmd`.
 
 ## Changes from upstream DXVK
 
