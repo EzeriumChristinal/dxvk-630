@@ -1,6 +1,6 @@
 # dxvk-630
 
-DXVK fork for Intel UHD 630 (Gen9.5) iGPUs on low-power UMA systems with constrained memory bandwidth. Built on DXVK v3.0.2, with async pipeline compilation from Sarek dyasync (v1.12.0) and a Gen9 low-power profile.
+DXVK fork for Intel UHD 630 (Gen9.5) iGPUs on low-power UMA systems with constrained memory bandwidth. Built on DXVK v3.0.2, with async pipeline compilation from Sarek dyasync (v1.12.0) & a Gen9 low-power profile.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ flowchart TD
     Presenter_FramePacer_FpsLimiter --> Vulkan_driver
 ```
 
-D3D8/D3D9/D3D11/DXGI frontends feed DxvkInstance, which detects Gen9 hardware and creates DxvkDevice. The device owns DxvkPipelineManager (with dyasync worker threads), DxvkContext, DxvkCsThread, and DxvkQueue, which submits command buffers to the Vulkan driver. Presents flow back through Presenter, FramePacer, and FpsLimiter. Editable source: `docs/architecture.mmd`.
+D3D8/D3D9/D3D11/DXGI frontends feed DxvkInstance, which detects Gen9 hardware & creates DxvkDevice. Device owns DxvkPipelineManager (with dyasync worker threads), DxvkContext, DxvkCsThread, & DxvkQueue, which submits command buffers to Vulkan driver. Presents flow back through Presenter, FramePacer, & FpsLimiter. Editable source: `docs/architecture.mmd`.
 
 ```mermaid
 sequenceDiagram
@@ -57,13 +57,13 @@ sequenceDiagram
     DxvkQueue_finish->>Presenter: signalFrame, fps limit
 ```
 
-App calls Present() on the D3D11 swapchain, which begins the frame pacer, emits a CS present lambda to DxvkContext, executes the chunk on DxvkCsThread, ends the frame with a fence callback, dispatches to DxvkQueue for vkQueueSubmit. The GPU fence signals DxvkQueue finish, which calls Presenter signalFrame and fps limit. Editable source: `docs/architecture-frame.mmd`.
+App calls Present() on D3D11 swapchain, which begins frame pacer, emits a CS present lambda to DxvkContext, executes chunk on DxvkCsThread, ends frame with a fence callback, dispatches to DxvkQueue for vkQueueSubmit. GPU fence signals DxvkQueue finish, which calls Presenter signalFrame & fps limit. Editable source: `docs/architecture-frame.mmd`.
 
 ## Changes from upstream DXVK
 
 | Change | Description |
 |--------|-------------|
-| Gen9 low-power profile | Detects UHD 630 hardware, sets memory budget to half the largest DEVICE_LOCAL heap, enables async compilation, clamps dyasync threads to 1..4. `dxvk.conf` overrides defaults |
+| Gen9 low-power profile | Detects UHD 630 hardware, sets memory budget to half largest DEVICE_LOCAL heap, enables async compilation, clamps dyasync threads to 1..4. `dxvk.conf` overrides defaults |
 | Dyasync pipeline compilation | Background threads compile pipelines off the hot path. `dxvk.enableDyasync`, `dxvk.numDyasyncThreads` |
 | Frame pacer | Three modes: max-frame-latency, low-latency, min-latency. `dxvk.framePace` or `DXVK_FRAME_PACE`, `dxvk.lowLatencyOffset` |
 | Narrowed pipeline barriers | Transfer/SDMA paths use transfer-only stage masks; external consumers stay `ALL_COMMANDS_BIT`. `d3d11.relaxedBarriers` |
@@ -74,7 +74,7 @@ App calls Present() on the D3D11 swapchain, which begins the frame pacer, emits 
 
 ## Changes from Sarek
 
-Sarek contributed dyasync and Gen9 detection. Targets UHD 630 only: no multi-vendor GPU profiles, simplified profile resolution, reworked frame pacer with three latency modes.
+Sarek contributed dyasync & Gen9 detection. Targets UHD 630 only: no multi-vendor GPU profiles, simplified profile resolution, reworked frame pacer with three latency modes.
 
 ## Building
 
@@ -90,7 +90,7 @@ Cross-compiles to `x86_64-w64-mingw32` from Linux or Windows.
 
 ## Configuration
 
-Shipped `dxvk.conf` sets the defaults. Put it next to `dxvk.dll`, point `DXVK_CONFIG_FILE` at it, or drop a per-game `dxvk.conf` in the game dir. Fork keys:
+Shipped `dxvk.conf` sets defaults. Put it next to `dxvk.dll`, point `DXVK_CONFIG_FILE` at it, or drop a per-game `dxvk.conf` in game dir. Fork keys:
 `dxvk.enableDyasync` (auto/on/off), `dxvk.numDyasyncThreads` (0 = auto),
 `dxvk.framePace` (empty / low-latency / min-latency), `dxvk.lowLatencyOffset`
 (microseconds, -10000..10000), `dxvk.maxMemoryBudget` (bytes; Gen9 auto = heap / 2).
@@ -98,4 +98,4 @@ Shipped `dxvk.conf` sets the defaults. Put it next to `dxvk.dll`, point `DXVK_CO
 ## Credits
 
 - [DXVK](https://github.com/doitsujin/dxvk) - upstream by Philip Rebohle
-- [DXVK-Sarek](https://github.com/pythonlover02/DXVK-Sarek) - dyasync and frame-pacer
+- [DXVK-Sarek](https://github.com/pythonlover02/DXVK-Sarek) - dyasync & frame-pacer
