@@ -32,7 +32,7 @@ flowchart TD
     Presenter_FramePacer_FpsLimiter --> Vulkan_driver
 ```
 
-Flow: D3D8/D3D9/D3D11/DXGI frontends feed DxvkInstance, which detects Gen9 hardware and creates DxvkDevice. The device owns DxvkPipelineManager (with dyasync worker threads), DxvkContext, DxvkCsThread, and DxvkQueue, which submits command buffers to the Vulkan driver. Presents flow back through Presenter, FramePacer, and FpsLimiter. Editable source: `docs/architecture.mmd`.
+D3D8/D3D9/D3D11/DXGI frontends feed DxvkInstance, which detects Gen9 hardware and creates DxvkDevice. The device owns DxvkPipelineManager (with dyasync worker threads), DxvkContext, DxvkCsThread, and DxvkQueue, which submits command buffers to the Vulkan driver. Presents flow back through Presenter, FramePacer, and FpsLimiter. Editable source: `docs/architecture.mmd`.
 
 ```mermaid
 sequenceDiagram
@@ -57,7 +57,7 @@ sequenceDiagram
     DxvkQueue_finish->>Presenter: signalFrame, fps limit
 ```
 
-Flow: App calls Present() on the D3D11 swapchain, which begins the frame pacer, emits a CS present lambda to DxvkContext, executes the chunk on DxvkCsThread, ends the frame with a fence callback, dispatches to DxvkQueue for vkQueueSubmit. The GPU fence signals DxvkQueue finish, which calls Presenter signalFrame and fps limit. Editable source: `docs/architecture-frame.mmd`.
+App calls Present() on the D3D11 swapchain, which begins the frame pacer, emits a CS present lambda to DxvkContext, executes the chunk on DxvkCsThread, ends the frame with a fence callback, dispatches to DxvkQueue for vkQueueSubmit. The GPU fence signals DxvkQueue finish, which calls Presenter signalFrame and fps limit. Editable source: `docs/architecture-frame.mmd`.
 
 ## Changes from upstream DXVK
 
