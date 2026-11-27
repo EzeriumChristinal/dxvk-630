@@ -12,7 +12,6 @@
 namespace dxvk {
   
   class DxvkDevice;
-  class DxvkPipelineCompiler;
   class DxvkPipelineManager;
   struct DxvkPipelineStats;
 
@@ -125,7 +124,6 @@ namespace dxvk {
     
     DxvkDevice*                 m_device = nullptr;
     DxvkPipelineStats*          m_stats = nullptr;
-    DxvkPipelineCompiler*       m_compiler = nullptr;
 
     DxvkShaderPipelineLibrary*  m_library = nullptr;
     std::optional<VkPipeline>   m_libraryHandle;

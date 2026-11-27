@@ -148,7 +148,6 @@ namespace dxvk {
     VkDeviceSize      memoryBudget  = 0u;
     VkMemoryHeap      properties    = { };
     bool              enforceBudget = false;
-    bool              enableEviction = false;
   };
 
 
@@ -1434,6 +1433,11 @@ namespace dxvk {
 
     uint32_t countEmptyChunksInPool(
       const DxvkMemoryPool&       pool) const;
+
+    void freeEmptyChunksForType(
+            DxvkMemoryType&       type,
+            VkDeviceSize          allocationSize,
+            high_resolution_clock::time_point time);
 
     void freeEmptyChunksInHeap(
       const DxvkMemoryHeap&       heap,

@@ -69,8 +69,6 @@ namespace dxvk {
 
   void removePipeline(DxvkGraphicsPipeline* pipeline);
 
-  void removePipeline(DxvkComputePipeline* pipeline);
-
   private:
 
     std::mutex                    m_mutex;

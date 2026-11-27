@@ -71,10 +71,18 @@ App calls Present() on D3D11 swapchain, which begins frame pacer, emits a CS pre
 | ALLOW_TEARING / forceHdr | Immediate present for DXGI flip model; forced HDR10 |
 | Link-time optimization | Release builds use LTO |
 | D3D9 frame pacer wiring | FramePacer in D3D9 swapchain alongside D3D11 |
+| Timeline semaphore submission | `submissionId` replaces `DxvkSubmitStatus` polling; `sync::Fence` timeline + `setSubmissionTimeout` |
+| Device-removed event | `RegisterDeviceRemovedEvent` signals post-loss via `signalDeviceRemovedEvents` on `VK_ERROR_DEVICE_LOST` |
+| FPS limiter pacing modes | `Precise/Sleep/Sliced/Spin` + `Deviation/Timeline/Reactive` methods; `DXVK_FRAME_RATE_PACING`, `DXVK_FRAME_RATE_METHOD` |
+| Memory eviction | Dead chunks considered; HVV deprioritized under budget; keep one chunk free strategy |
+| Shader cache | Ref-counted singleton with condition variable wait; fixes cold-cache sync compile |
+| Vertex input state | `eq` no longer overwritten after divisor mismatch |
 
 ## Changes from Sarek
 
 Sarek contributed dyasync & Gen9 detection. Targets UHD 630 only: no multi-vendor GPU profiles, simplified profile resolution, reworked frame pacer with three latency modes.
+
+Sarek fps limiter commit 5797fb9b ported: pacing modes (Precise/Sleep/Sliced/Spin) and methods (Deviation/Timeline/Reactive) in `src/util/util_fps_limiter.{h,cpp}`, exposed via `dxvk.conf` and env vars `DXVK_FRAME_RATE_PACING` / `DXVK_FRAME_RATE_METHOD`. Fork `setTargetFrameRate` entry point unchanged.
 
 ## Building
 
@@ -94,6 +102,7 @@ Shipped `dxvk.conf` sets defaults. Put it next to `dxvk.dll`, point `DXVK_CONFIG
 `dxvk.enableDyasync` (auto/on/off), `dxvk.numDyasyncThreads` (0 = auto),
 `dxvk.framePace` (empty / low-latency / min-latency), `dxvk.lowLatencyOffset`
 (microseconds, -10000..10000), `dxvk.maxMemoryBudget` (bytes; Gen9 auto = heap / 2).
+Fps limiter keys: `dxvk.frameRatePacing` (precise/sleep/sliced/spin), `dxvk.frameRateMethod` (deviation/timeline/reactive).
 
 ## Credits
 

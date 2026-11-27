@@ -129,7 +129,9 @@ namespace dxvk {
      */
     VkResult presentImage(
             uint64_t                frameId,
-      const Rc<DxvkLatencyTracker>& tracker);
+            uint64_t                latencyFrameId = 0ull,
+            uint32_t                rectCount      = 0u,
+      const VkRectLayerKHR*         rects          = nullptr);
 
     /**
      * \brief Signals a given frame
@@ -141,9 +143,7 @@ namespace dxvk {
      * \param [in] frameId Frame ID
      * \param [in] tracker Latency tracker
      */
-    void signalFrame(
-            uint64_t                frameId,
-      const Rc<DxvkLatencyTracker>& tracker);
+    void signalFrame(uint64_t frameId);
 
     /**
      * \brief Changes sync interval

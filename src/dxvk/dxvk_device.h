@@ -1,5 +1,8 @@
 #pragma once
 
+#include <windows.h>
+#include <vector>
+
 #include "dxvk_adapter.h"
 #include "dxvk_buffer.h"
 #include "dxvk_compute.h"
@@ -263,6 +266,23 @@ namespace dxvk {
     VkResult getDeviceStatus() const {
       return m_submissionQueue.getLastError();
     }
+
+    /**
+     * \brief Register a device-removed event handle
+     *
+     * The event will be signaled when the device is lost.
+     * \param [in] hEvent Event handle to signal on device removal
+     */
+    void registerDeviceRemovedEvent(
+            HANDLE                    hEvent);
+
+    /**
+     * \brief Signal all registered device-removed events
+     *
+     * Called when the device is lost. Signals all registered
+     * event handles and clears the registration list.
+     */
+    void signalDeviceRemovedEvents();
 
     /**
      * \brief Queries mapped image subresource layout
@@ -643,36 +663,33 @@ namespace dxvk {
 
     /**
      * \brief Presents a swap chain image
-     * 
+     *
      * Invokes the presenter's \c presentImage method on
      * the submission thread. The status of this operation
      * can be retrieved with \ref waitForSubmission.
      * \param [in] presenter The presenter
-     * \param [in] tracker Latency tracker
      * \param [in] frameId Frame ID
-     * \param [out] status Present status
+     * \param [in] latencyFrameId Latency frame ID
+     * \param [in] rectCount Number of dirty rects
+     * \param [in] rects Dirty rectangles
      */
     void presentImage(
-      const Rc<Presenter>&            presenter,
-      const Rc<DxvkLatencyTracker>&   tracker,
-            uint64_t                  frameId,
-            DxvkSubmitStatus*         status);
-    
+      const Rc<Presenter>&  presenter,
+            uint64_t        frameId,
+            uint64_t        latencyFrameId,
+            uint32_t        rectCount,
+      const VkRectLayerKHR* rects);
+
     /**
      * \brief Submits a command list
-     * 
-     * Submits the given command list to the device using
-     * the given set of optional synchronization primitives.
+     *
+     * Submits the given command list to the device.
      * \param [in] commandList The command list to submit
-     * \param [in] tracker Latency tracker
-     * \param [in] frameId Frame ID
-     * \param [out] status Submission feedback
+     * \param [in] submissionId Submission timeline ID
      */
     void submitCommandList(
-      const Rc<DxvkCommandList>&      commandList,
-      const Rc<DxvkLatencyTracker>&   tracker,
-            uint64_t                  frameId,
-            DxvkSubmitStatus*         status);
+      const Rc<DxvkCommandList>&  commandList,
+            uint64_t              submissionId);
 
     /**
      * \brief Locks submission queue
@@ -709,11 +726,19 @@ namespace dxvk {
 
     /**
      * \brief Waits for a given submission
-     * 
-     * \param [in,out] status Submission status
+     *
+     * \param [in] submissionId Submission timeline ID
      * \returns Result of the submission
      */
-    VkResult waitForSubmission(DxvkSubmitStatus* status);
+    VkResult waitForSubmission(uint64_t submissionId);
+
+    /**
+     * \brief Sets submission timeout used to detect GPU hangs
+     *
+     * \param [in] timeout Desired timeout, in nanoseconds.
+     *    Pass -1 to disable timeout-based hang detection.
+     */
+    void setSubmissionTimeout(uint64_t timeout);
 
     /**
      * \brief Waits for a fence to become signaled
@@ -788,6 +813,10 @@ namespace dxvk {
     DxvkSubmissionQueue         m_submissionQueue;
 
     Rc<DxvkShaderCache>         m_shaderCache;
+
+    dxvk::mutex                 m_deviceRemovedLock;
+    std::vector<HANDLE>         m_deviceRemovedEvents;
+
 
     DxvkDevicePerfHints getPerfHints();
 

@@ -171,7 +171,7 @@ namespace dxvk {
   }
 
 
-  VkResult Presenter::presentImage(uint64_t frameId, const Rc<DxvkLatencyTracker>& tracker) {
+  VkResult Presenter::presentImage(uint64_t frameId, uint64_t latencyFrameId, uint32_t rectCount, const VkRectLayerKHR* rects) {
     PresenterSync& currSync = m_semaphores.at(m_frameIndex);
 
     VkPresentIdKHR presentId = { VK_STRUCTURE_TYPE_PRESENT_ID_KHR };
@@ -246,7 +246,7 @@ namespace dxvk {
 
       auto& frame = m_frameQueue.emplace();
       frame.frameId = frameId;
-      frame.tracker = tracker;
+      frame.tracker = nullptr;
       frame.mode = m_presentMode;
       frame.result = status;
 
@@ -280,9 +280,7 @@ namespace dxvk {
   }
 
 
-  void Presenter::signalFrame(
-          uint64_t                frameId,
-    const Rc<DxvkLatencyTracker>& tracker) {
+  void Presenter::signalFrame(uint64_t frameId) {
     if (m_signal == nullptr || !frameId)
       return;
 
@@ -316,9 +314,6 @@ namespace dxvk {
 
       m_fpsLimiter.delay();
       m_signal->signal(frameId);
-
-      if (tracker)
-        tracker->notifyGpuPresentEnd(frameId);
     }
   }
 

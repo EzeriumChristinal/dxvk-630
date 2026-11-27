@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <thread>
 
 #include "thread.h"
@@ -11,9 +12,51 @@
 using namespace std::chrono_literals;
 
 namespace dxvk {
-  
-  FpsLimiter::FpsLimiter() {
 
+  namespace {
+
+    // Wait budgets. The slice step bounds how long any single sleep call
+    // may run, so one mispredicted sleep costs at most a step rather than
+    // the rest of the frame.
+    constexpr int64_t SliceMarginNs = 150000;   // 0.15 ms
+    constexpr int64_t SliceStepNs   = 1000000;  // 1 ms
+
+    using TimePoint = dxvk::high_resolution_clock::time_point;
+    using TimerDuration = std::chrono::nanoseconds;
+
+    FpsLimitPacing pacingFromEnv(FpsLimitPacing fallback) {
+      const std::string name = env::getEnvVar("DXVK_FRAME_RATE_PACING");
+
+      if (name == "precise")
+        return FpsLimitPacing::Precise;
+      if (name == "sleep")
+        return FpsLimitPacing::Sleep;
+      if (name == "sliced")
+        return FpsLimitPacing::Sliced;
+      if (name == "spin")
+        return FpsLimitPacing::Spin;
+      return fallback;
+    }
+
+    FpsLimitMethod methodFromEnv(FpsLimitMethod fallback) {
+      const std::string name = env::getEnvVar("DXVK_FRAME_RATE_METHOD");
+
+      if (name == "deviation")
+        return FpsLimitMethod::Deviation;
+      if (name == "timeline")
+        return FpsLimitMethod::Timeline;
+      if (name == "reactive")
+        return FpsLimitMethod::Reactive;
+      return fallback;
+    }
+
+  }
+
+
+  FpsLimiter::FpsLimiter() {
+    m_pacing  = pacingFromEnv(FpsLimitPacing::Precise);
+    m_method  = methodFromEnv(FpsLimitMethod::Deviation);
+    m_hasTarget = false;
   }
 
 
@@ -37,44 +80,148 @@ namespace dxvk {
       m_heuristicEnable = false;
 
       m_maxLatency = maxLatency;
+
+      m_hasTarget = interval != TimerDuration::zero();
+
+      if (!std::exchange(m_heuristicEnable, false))
+        Logger::warn("Built-in frame rate limiter enabled. Please enable an external"
+                     " limiter instead in order to avoid poor frame pacing.");
     }
   }
 
 
   void FpsLimiter::delay() {
     std::unique_lock<dxvk::mutex> lock(m_mutex);
-    auto interval = m_targetInterval;
-    auto latency = m_maxLatency;
 
-    if (interval == TimerDuration::zero()) {
+    if (m_targetInterval == TimerDuration::zero()) {
       m_nextFrame = TimePoint();
+      m_hasTarget = false;
       return;
     }
 
     auto t1 = dxvk::high_resolution_clock::now();
 
-    if (interval < TimerDuration::zero()) {
-      interval = -interval;
-
-      if (!testRefreshHeuristic(interval, t1, latency))
-        return;
-    }
-
-    // Subsequent code must not access any class members
-    // that can be written by setTargetFrameRate. Snapshot the
-    // frame deadline too: a concurrent delay() rewrites m_nextFrame
+    // Snapshot frame deadline too: a concurrent delay() rewrites m_nextFrame
     // under the same mutex, so reading it unlocked is a race (R20-3).
     TimePoint nextFrame = m_nextFrame;
     lock.unlock();
 
-    if (t1 < nextFrame)
-      Sleep::sleepUntil(t1, nextFrame);
+    switch (m_method) {
+      case FpsLimitMethod::Deviation:
+        delayDeviation();
+        break;
+
+      case FpsLimitMethod::Timeline:
+      case FpsLimitMethod::Reactive:
+        delayTimeline();
+        break;
+    }
 
     lock.lock();
-    m_nextFrame = (t1 < nextFrame + interval)
-      ? nextFrame + interval
-      : t1 + interval;
+    m_nextFrame = nextTarget(t1);
     lock.unlock();
+  }
+
+
+  void FpsLimiter::delayDeviation() {
+    auto t0 = m_nextFrame;
+    auto t1 = dxvk::high_resolution_clock::now();
+
+    auto interval = m_targetInterval;
+
+    if (t1 < t0) {
+      // Frame is ahead of schedule; sleep until the deadline.
+      Sleep::sleepUntil(t1, t0);
+    } else {
+      // Frame is behind schedule; skip the sleep and reschedule from now.
+      t0 = t1;
+    }
+  }
+
+
+  void FpsLimiter::delayTimeline() {
+    auto t1 = dxvk::high_resolution_clock::now();
+
+    // Absolute cadence: advance by exactly one interval per frame,
+    // resynchronising only after a frame that overran a whole interval.
+    m_nextFrame = nextTarget(t1);
+  }
+
+
+  TimePoint FpsLimiter::nextTarget(TimePoint now) {
+    if (!m_hasTarget)
+      return TimePoint();
+
+    return (now < m_nextFrame)
+      ? m_nextFrame
+      : now + m_targetInterval;
+  }
+
+
+  TimePoint FpsLimiter::sleepOnce(TimerDuration duration) {
+    if (duration <= TimerDuration::zero())
+      return dxvk::high_resolution_clock::now();
+
+    auto t0 = dxvk::high_resolution_clock::now();
+    return Sleep::sleepFor(t0, duration);
+  }
+
+
+  TimePoint FpsLimiter::sleepPrecise(TimePoint t0, TimerDuration duration) {
+    if (duration <= TimerDuration::zero())
+      return dxvk::high_resolution_clock::now();
+
+    // Sleep coarsely for most of the duration, then busy-wait the last
+    // stretch so we land as close to the deadline as possible.
+    auto coarse = duration - TimerDuration(SliceMarginNs);
+    if (coarse > TimerDuration::zero()) {
+      auto t1 = dxvk::high_resolution_clock::now();
+      if (t1 < t0 + coarse)
+        Sleep::sleepUntil(t1, t0 + coarse);
+    }
+
+    auto t1 = dxvk::high_resolution_clock::now();
+    auto deadline = t0 + duration;
+    while (dxvk::high_resolution_clock::now() < deadline)
+      ; // busy-wait the final margin
+
+    return dxvk::high_resolution_clock::now();
+  }
+
+
+  TimePoint FpsLimiter::sleepSliced(TimePoint t0, TimerDuration duration) {
+    if (duration <= TimerDuration::zero())
+      return dxvk::high_resolution_clock::now();
+
+    auto deadline = t0 + duration;
+    auto now = dxvk::high_resolution_clock::now();
+
+    while (now < deadline) {
+      auto remaining = deadline - now;
+      if (remaining <= TimerDuration(SliceStepNs)) {
+        // Final slice: busy-wait the short remainder.
+        while (dxvk::high_resolution_clock::now() < deadline)
+          ;
+        break;
+      }
+
+      auto slice = std::min(remaining - TimerDuration(SliceMarginNs), TimerDuration(SliceStepNs));
+      if (slice > TimerDuration::zero()) {
+        now = Sleep::sleepFor(now, slice);
+      }
+
+      now = dxvk::high_resolution_clock::now();
+    }
+
+    return now;
+  }
+
+
+  TimePoint FpsLimiter::spinUntil(TimePoint t0, TimerDuration duration) {
+    auto deadline = t0 + duration;
+    while (dxvk::high_resolution_clock::now() < deadline)
+      ; // busy-wait the entire remainder
+    return dxvk::high_resolution_clock::now();
   }
 
 

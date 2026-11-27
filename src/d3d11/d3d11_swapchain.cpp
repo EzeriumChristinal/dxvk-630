@@ -470,9 +470,9 @@ namespace dxvk {
         cPacer->endFrame(cFrameId);
       }
 
-      ctx->flushCommandList(nullptr, nullptr);
+      ctx->flushCommandList(nullptr, 0u);
 
-      cDevice->presentImage(cPresenter, cLatency, cFrameId, nullptr);
+      cDevice->presentImage(cPresenter, cFrameId, 0, 0, nullptr);
     });
 
     if (m_backBuffers.size() > 1u)

@@ -18,7 +18,6 @@ namespace dxvk {
           DxvkShaderPipelineLibrary*  library)
   : m_device        (device),
     m_stats         (&pipeMgr->m_stats),
-    m_compiler      (pipeMgr->m_compiler.ptr()),
     m_library       (library),
     m_shaders       (std::move(shaders)),
     m_layout        (device, pipeMgr, m_shaders.cs->getLayout()),
@@ -28,8 +27,6 @@ namespace dxvk {
   
   
   DxvkComputePipeline::~DxvkComputePipeline() {
-    if (m_compiler)
-      m_compiler->removePipeline(this);
     m_library->releasePipelineHandle();
 
     m_pipelines.forEach([this] (const DxvkComputePipelineInstance& instance) {

@@ -1112,9 +1112,6 @@ namespace dxvk {
           BOOL                        Synchronize) {
     bool synchronizeSubmission = Synchronize && m_parent->Is11on12Device();
 
-    if (synchronizeSubmission)
-      m_submitStatus.result = VK_NOT_READY;
-
     // Exit early if there's nothing to do. If an event is supplied it must
     // be signalled when the pending GPU work completes, so we cannot return
     // early in that case - otherwise the event fires before the work is done.
@@ -1138,7 +1135,6 @@ namespace dxvk {
     EmitCs<false>([
       cSubmissionFence  = m_submissionFence,
       cSubmissionId     = submissionId,
-      cSubmissionStatus = synchronizeSubmission ? &m_submitStatus : nullptr,
       cStagingFence     = m_stagingBufferFence,
       cStagingMemory    = GetStagingMemoryStatistics().allocatedTotal,
       cFlushReason      = std::exchange(m_flushReason, std::string())
@@ -1147,7 +1143,7 @@ namespace dxvk {
 
       ctx->signal(cSubmissionFence, cSubmissionId);
       ctx->signal(cStagingFence, cStagingMemory);
-      ctx->flushCommandList(&debugLabel, cSubmissionStatus);
+      ctx->flushCommandList(&debugLabel, cSubmissionId);
     });
 
     FlushCsChunk();
@@ -1159,7 +1155,7 @@ namespace dxvk {
     // If necessary, block calling thread until the
     // Vulkan queue submission is performed.
     if (synchronizeSubmission)
-      m_device->waitForSubmission(&m_submitStatus);
+      m_device->waitForSubmission(submissionId);
 
     // Free local staging buffer so that we don't
     // end up with a persistent allocation

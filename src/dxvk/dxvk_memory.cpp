@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <optional>
 #include <iomanip>
 #include <sstream>
 
@@ -1342,14 +1343,12 @@ namespace dxvk {
     if (type.bufferUsage && !next)
       size = align(size, GlobalBufferAlignment);
 
-    // Preemptively free some unused allocations to reduce memory waste
-    freeEmptyChunksInHeap(*type.heap, size, high_resolution_clock::now());
+    // Preemptively free some unused allocations to reduce memory waste.
+    freeEmptyChunksForType(type, size, high_resolution_clock::now());
 
     // If we're exceeding vram budget on a dedicated GPU, fall back to system memory.
-    if (!next && type.heap->enforceBudget && (getMemoryStats(type.heap->index).memoryAllocated + size > type.heap->memoryBudget)) {
-      type.heap->enableEviction = true;
+    if (!next && type.heap->enforceBudget && (getMemoryStats(type.heap->index).memoryAllocated + size > type.heap->memoryBudget))
       return DxvkDeviceMemory();
-    }
 
     VkMemoryAllocateInfo memoryInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, next };
     memoryInfo.allocationSize = size;
@@ -1718,6 +1717,38 @@ namespace dxvk {
   }
 
 
+  void DxvkMemoryAllocator::freeEmptyChunksForType(
+          DxvkMemoryType&       type,
+          VkDeviceSize          allocationSize,
+          high_resolution_clock::time_point time) {
+    bool freed = false;
+
+    // Always check the memory type that we actually want to allocate memory from first
+    freed |= freeEmptyChunksInPool(type, type.devicePool, allocationSize, time);
+    freed |= freeEmptyChunksInPool(type, type.mappedPool, allocationSize, time);
+
+    // When allocating HVV, do not mess around with the main device-local memory type
+    // since that is generally going to be far more important for performance. Instead,
+    // simply fall back to system memory.
+    VkMemoryPropertyFlags hvvFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
+      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+    bool isHvv = (type.properties.propertyFlags & hvvFlags) == hvvFlags && type.heap->enforceBudget;
+
+    if (!isHvv) {
+      for (auto typeIndex : bit::BitMask(type.heap->memoryTypes & ~(1u << type.index))) {
+        auto& otherType = m_memTypes[typeIndex];
+
+        freed |= freeEmptyChunksInPool(otherType, otherType.devicePool, allocationSize, time);
+        freed |= freeEmptyChunksInPool(otherType, otherType.mappedPool, allocationSize, time);
+      }
+    }
+
+    if (freed)
+      updateMemoryHeapStats(type.heap->index);
+  }
+
+
   void DxvkMemoryAllocator::freeEmptyChunksInHeap(
     const DxvkMemoryHeap&       heap,
           VkDeviceSize          allocationSize,
@@ -1767,7 +1798,7 @@ namespace dxvk {
       // Free the chunk if it is smaller than the current chunk size of
       // the pool, since it is unlikely to be useful for future allocations.
       // Also free if the pending allocation would exceed the heap budget.
-      bool shouldFree = chunk.memory.size < pool.nextChunkSize
+      bool shouldFree = (chunk.memory.size < pool.nextChunkSize && allocationSize)
         || allocationSize + heapAllocated > heapBudget
         || allocationSize > heapBudget;
 
@@ -2643,43 +2674,40 @@ namespace dxvk {
     // Doing this on Gen9 iGPUs would be harmful, so don't. Keep the gate
     // on the target part (matches enableDefrag) so non-Gen9 UMA devices
     // behave like upstream and still evict under pressure.
-    if (pool.chunks.empty() || !type.heap->enableEviction
+    if (pool.chunks.empty() || !type.heap->enforceBudget
      || m_device->adapter()->isGen9LowPower())
       return;
 
-    // Work out how much memory we should ideally leave unused
-    VkDeviceSize minUnusedMemory = 2u * pool.maxChunkSize;
+    // If we're within budget with some headroom already, don't evict
+    // anything as we're likely able to service subsequent allocations.
+    DxvkMemoryStats heapStats = getMemoryStats(type.heap->index);
 
-    // Account for mapped memory types on the same heap where we may not be
-    // able to move any resources, and count their total allocated amount.
-    VkDeviceSize heapUsage = type.stats.memoryUsed;
-
-    for (auto i : bit::BitMask(type.heap->memoryTypes & ~(1u << type.index)))
-      heapUsage += m_memTypes[i].stats.memoryAllocated;
-
-    // If we're within budget with some headroom already, don't evict anything.
-    VkDeviceSize heapBudget = getMemoryStats(type.heap->index).memoryBudget;
-
-    if (heapUsage + minUnusedMemory <= heapBudget)
+    if (heapStats.memoryAllocated + pool.maxChunkSize < heapStats.memoryBudget)
       return;
+
+    // If there's an empty chunk of the maximum allowed size, there's
+    // no real point in evicting anything either since new allocations
+    // can just go there.
+    for (uint32_t i = 0u; i < pool.chunks.size(); i++) {
+      if (!pool.pageAllocator.pagesUsed(i) && pool.chunks[i].memory.size == pool.maxChunkSize)
+        return;
+    }
 
     // Check the old previous chunk to evict unused resources right
     // away, and then advance to the next available chunk if possible
     std::array<uint32_t, 2u> chunkIndices = { pool.nextEvictChunk, ~0u };
 
-    for (uint32_t i = 0u; i < pool.chunks.size(); i++) {
-      pool.nextEvictChunk += 1u;
-      pool.nextEvictChunk %= pool.chunks.size();
+    pool.nextEvictChunk += 1u;
+    pool.nextEvictChunk %= pool.chunks.size();
 
-      if (pool.pageAllocator.chunkIsAvailable(pool.nextEvictChunk))
-        break;
-    }
+    if (chunkIndices[0u] != pool.nextEvictChunk)
+      chunkIndices[1u] = pool.nextEvictChunk;
 
-    chunkIndices[1u] = pool.nextEvictChunk;
+    std::optional<uint32_t> evictedChunk;
 
     for (auto chunkIndex : chunkIndices) {
-      // Ensure we actually have a valid, live chunk to work with
       if (chunkIndex >= pool.chunks.size() || !pool.pageAllocator.chunkIsAvailable(chunkIndex))
+
         continue;
 
       auto& chunk = pool.chunks[chunkIndex];
@@ -2704,31 +2732,29 @@ namespace dxvk {
         if (!resource)
           continue;
 
-        bool evicted = resource->requestEviction();
-
-        if (evicted && (heapUsage + minUnusedMemory > heapBudget + memoryEvicted)) {
+        if (resource->requestEviction()) {
           m_relocations.addResource(std::move(resource), a, DxvkAllocationMode::NoDeviceMemory);
           memoryEvicted += a->getMemoryInfo().size;
         }
-
-        if (!evicted && memoryEvicted) {
-          // Relocate other resources within the chunk to reduce fragmentation
-          m_relocations.addResource(std::move(resource), a, DxvkAllocationModes(
-            DxvkAllocationMode::NoFallback, DxvkAllocationMode::NoAllocation));
-        }
       }
 
-      // Relocate resource in the chunk we evicted from, and override any
-      // chunk that defragmentation may have picked. This greatly reduces
-      // fragmentation caused evicting a subset of resources from the chunk.
-      if (memoryEvicted) {
-        pool.pageAllocator.killChunk(chunkIndex);
+      if (memoryEvicted && !evictedChunk)
+        evictedChunk = std::make_optional(chunkIndex);
+    }
 
-        for (uint32_t i = 0u; i < pool.chunks.size(); i++) {
-          if (i != chunkIndex && pool.pageAllocator.pagesUsed(i))
-            pool.pageAllocator.reviveChunk(i);
-        }
+    // Relocate resource in the chunk we evicted from, and override any
+    // chunk that defragmentation may have picked. This greatly reduces
+    // fragmentation caused evicting a subset of resources from the chunk.
+    if (evictedChunk) {
+      pool.pageAllocator.killChunk(*evictedChunk);
+      pool.nextDefragChunk = *evictedChunk;
+
+      for (uint32_t i = 0u; i < pool.chunks.size(); i++) {
+        if (i != *evictedChunk && pool.pageAllocator.pagesUsed(i))
+          pool.pageAllocator.reviveChunk(i);
       }
+
+      moveDefragChunk(type);
     }
   }
 

@@ -1986,6 +1986,8 @@ namespace dxvk {
 
     *pdwCookie = cookie;
 
+    m_dxvkDevice->registerDeviceRemovedEvent(hEvent);
+
     if (m_dxvkDevice->getDeviceStatus() != VK_SUCCESS)
       SetEvent(hEvent);
 

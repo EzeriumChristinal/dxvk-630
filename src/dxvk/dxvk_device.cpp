@@ -647,53 +647,47 @@ namespace dxvk {
 
 
   void DxvkDevice::presentImage(
-    const Rc<Presenter>&            presenter,
-    const Rc<DxvkLatencyTracker>&   tracker,
-          uint64_t                  frameId,
-          DxvkSubmitStatus*         status) {
+    const Rc<Presenter>&  presenter,
+          uint64_t        frameId,
+          uint64_t        latencyFrameId,
+          uint32_t        rectCount,
+    const VkRectLayerKHR* rects) {
     DxvkPresentInfo presentInfo = { };
     presentInfo.presenter = presenter;
     presentInfo.frameId = frameId;
+    presentInfo.latencyFrameId = latencyFrameId;
 
-    DxvkLatencyInfo latencyInfo;
-    latencyInfo.tracker = tracker;
-    latencyInfo.frameId = frameId;
+    for (uint32_t i = 0u; i < rectCount; i++)
+      presentInfo.rects.push_back(rects[i]);
 
-    m_submissionQueue.present(presentInfo, latencyInfo, status);
-    
+    m_submissionQueue.present(presentInfo);
+
     std::lock_guard<sync::Spinlock> statLock(m_statLock);
     m_statCounters.addCtr(DxvkStatCounter::QueuePresentCount, 1);
   }
 
 
   void DxvkDevice::submitCommandList(
-    const Rc<DxvkCommandList>&      commandList,
-    const Rc<DxvkLatencyTracker>&   tracker,
-          uint64_t                  frameId,
-          DxvkSubmitStatus*         status) {
+    const Rc<DxvkCommandList>&  commandList,
+          uint64_t              submissionId) {
     DxvkSubmitInfo submitInfo = { };
     submitInfo.cmdList = commandList;
 
-    DxvkLatencyInfo latencyInfo;
-    latencyInfo.tracker = tracker;
-    latencyInfo.frameId = frameId;
-
-    m_submissionQueue.submit(submitInfo, latencyInfo, status);
+    m_submissionQueue.submit(submitInfo, submissionId);
 
     std::lock_guard<sync::Spinlock> statLock(m_statLock);
     m_statCounters.merge(commandList->statCounters());
   }
-  
-  
-  VkResult DxvkDevice::waitForSubmission(DxvkSubmitStatus* status) {
-    VkResult result = status->result.load();
 
-    if (result == VK_NOT_READY) {
-      m_submissionQueue.synchronizeSubmission(status);
-      result = status->result.load();
-    }
 
-    return result;
+  VkResult DxvkDevice::waitForSubmission(uint64_t submissionId) {
+    m_submissionQueue.synchronizeSubmission(submissionId);
+    return VK_SUCCESS;
+  }
+
+
+  void DxvkDevice::setSubmissionTimeout(uint64_t timeout) {
+    m_submissionQueue.setSubmissionTimeout(timeout);
   }
 
 
@@ -739,6 +733,25 @@ namespace dxvk {
       Logger::err("DxvkDevice: waitForIdle: Operation failed");
 
     m_submissionQueue.unlockDeviceQueue();
+  }
+
+
+  void DxvkDevice::registerDeviceRemovedEvent(
+          HANDLE                    hEvent) {
+    std::lock_guard<dxvk::mutex> lock(m_deviceRemovedLock);
+    m_deviceRemovedEvents.push_back(hEvent);
+  }
+
+
+  void DxvkDevice::signalDeviceRemovedEvents() {
+    std::vector<HANDLE> events;
+
+    { std::lock_guard<dxvk::mutex> lock(m_deviceRemovedLock);
+      events.swap(m_deviceRemovedEvents);
+    }
+
+    for (auto event : events)
+      SetEvent(event);
   }
 
 

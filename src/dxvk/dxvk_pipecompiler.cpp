@@ -210,24 +210,6 @@ namespace dxvk {
   }
 
 
-  void DxvkPipelineCompiler::removePipeline(DxvkComputePipeline* pipeline) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-
-    for (auto i = m_queuedComputePipelines.begin(); i != m_queuedComputePipelines.end(); ) {
-      if (i->pipeline == pipeline)
-        i = m_queuedComputePipelines.erase(i);
-      else
-        i++;
-    }
-
-    auto pred = [pipeline](const DxvkPipelineEntry& e) { return e.computePipeline == pipeline; };
-    m_liveQueue.erase(std::remove_if(m_liveQueue.begin(), m_liveQueue.end(), pred),
-      m_liveQueue.end());
-    m_backgroundQueue.erase(std::remove_if(m_backgroundQueue.begin(), m_backgroundQueue.end(), pred),
-      m_backgroundQueue.end());
-  }
-
-
   bool DxvkPipelineCompiler::takeEntry(DxvkPipelineEntry& entry, bool preferBackground) {
     if (!(preferBackground && !m_backgroundQueue.empty()) && !m_liveQueue.empty()) {
       entry = pop_front(m_liveQueue);
