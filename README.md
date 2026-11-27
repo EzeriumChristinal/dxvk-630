@@ -1,6 +1,6 @@
 # dxvk-630
 
-DXVK fork for Intel UHD 630 (Gen9.5) iGPUs on low-power UMA systems with constrained memory bandwidth. Built on DXVK v3.0.2, with async pipeline compilation from Sarek dyasync (v1.12.0) & a Gen9 low-power profile.
+DXVK fork for Intel UHD 630 (Gen9.5) iGPUs on low-power UMA systems with constrained memory bandwidth. Built on DXVK v3.0.2, backported from DXVK v3.2 & Sarek v1.14.1, with async pipeline compilation from Sarek dyasync & a Gen9 low-power profile.
 
 ## Architecture
 
